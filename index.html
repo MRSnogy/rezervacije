@@ -640,7 +640,7 @@
         <div class="form-grid">
           <div class="form-group">
             <label>Uplaćeni polog (€)</label>
-            <input class="form-input" type="number" id="f-deposit" min="0" step="0.01" value="0" />
+            <input class="form-input" type="number" id="f-deposit" min="0" step="0.01" value="0" oninput="updatePricePreview()" />
           </div>
           <div class="form-group">
             <label>Plaćeno</label>
@@ -1273,22 +1273,26 @@ function updatePricePreview() {
   const exc      = document.getElementById('f-excursion')?.value;
   const adults   = parseInt(document.getElementById('f-adults')?.value)||0;
   const children = parseInt(document.getElementById('f-children')?.value)||0;
+  const deposit  = parseFloat(document.getElementById('f-deposit')?.value)||0;
   const discount = document.getElementById('f-discount')?.value==='DA';
   if (!exc) { document.getElementById('pricePreview').style.display='none'; return; }
 
-  const p     = prices[exc]||{adult:0,child:0,type:'person'};
-  const fixed = p.type === 'fixed';
-  const total = calcTotal(exc, adults, children);
-  const comm  = total*(discount?.15:.25);
+  const p        = prices[exc]||{adult:0,child:0,type:'person'};
+  const fixed    = p.type === 'fixed';
+  const basePrice= calcTotal(exc, adults, children);
+  const total    = basePrice + deposit;
+  const comm     = total*(discount?.15:.25);
 
   document.getElementById('pricePreview').style.display='flex';
   document.getElementById('previewTotal').textContent = fmtEur(total);
   document.getElementById('previewComm').textContent  = fmtEur(comm);
-  document.getElementById('previewBreakdown').textContent = fixed
-    ? `🚢 Fiksna cijena broda | Provizija: ${discount?'15%':'25%'}`
-    : `${adults} odraslih × ${fmtEur(p.adult)} + ${children} djece × ${fmtEur(p.child)} | Provizija: ${discount?'15%':'25%'}`;
 
-  // Show/hide adult-children count rows visually (still kept for records)
+  const baseText = fixed
+    ? `🚢 Fiksna cijena broda ${fmtEur(basePrice)}`
+    : `${adults} odraslih × ${fmtEur(p.adult)} + ${children} djece × ${fmtEur(p.child)}`;
+  document.getElementById('previewBreakdown').textContent =
+    `${baseText} + polog ${fmtEur(deposit)} | Provizija: ${discount?'15%':'25%'}`;
+
   const hint = document.getElementById('fixedPriceHint');
   if (hint) hint.style.display = fixed ? 'flex' : 'none';
 }
@@ -1329,8 +1333,9 @@ async function submitBooking(e) {
   const exc      = document.getElementById('f-excursion').value;
   const adults   = parseInt(document.getElementById('f-adults').value)||0;
   const children = parseInt(document.getElementById('f-children').value)||0;
+  const deposit  = parseFloat(document.getElementById('f-deposit').value)||0;
   const discount = document.getElementById('f-discount').value;
-  const total    = calcTotal(exc,adults,children);
+  const total    = calcTotal(exc,adults,children) + deposit;
 
   const booking = {
     name:       document.getElementById('f-name').value.trim(),
@@ -1343,7 +1348,7 @@ async function submitBooking(e) {
     menuRiba:   parseInt(document.getElementById('f-riba').value)||0,
     menuMeso:   parseInt(document.getElementById('f-meso').value)||0,
     menuVege:   parseInt(document.getElementById('f-vege').value)||0,
-    deposit:    parseFloat(document.getElementById('f-deposit').value)||0,
+    deposit,
     paid:       document.getElementById('f-paid').value,
     seller:     document.getElementById('f-seller').value,
     discount,
@@ -1538,8 +1543,9 @@ async function saveEdit(e) {
   const exc      = document.getElementById('e-excursion').value;
   const adults   = parseInt(document.getElementById('e-adults').value)||0;
   const children = parseInt(document.getElementById('e-children').value)||0;
+  const deposit  = parseFloat(document.getElementById('e-deposit').value)||0;
   const discount = document.getElementById('e-discount').value;
-  const total    = calcTotal(exc,adults,children);
+  const total    = calcTotal(exc,adults,children) + deposit;
   const updated  = {
     name:       document.getElementById('e-name').value.trim(),
     phone:      document.getElementById('e-phone').value.trim(),
@@ -1551,7 +1557,7 @@ async function saveEdit(e) {
     menuRiba:   parseInt(document.getElementById('e-riba').value)||0,
     menuMeso:   parseInt(document.getElementById('e-meso').value)||0,
     menuVege:   parseInt(document.getElementById('e-vege').value)||0,
-    deposit:    parseFloat(document.getElementById('e-deposit').value)||0,
+    deposit,
     paid:       document.getElementById('e-paid').value,
     seller:     document.getElementById('e-seller').value,
     discount, totalPrice:total, commission:calcComm(total,discount)
