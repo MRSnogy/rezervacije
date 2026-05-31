@@ -824,14 +824,6 @@
             </div>
             <input type="hidden" id="f-paid" value="NE" />
           </div>
-          <div class="form-group">
-            <label>Popust</label>
-            <div class="toggle-wrap">
-              <button type="button" class="toggle-opt" id="disc-yes" onclick="setToggle('disc','DA')">DA</button>
-              <button type="button" class="toggle-opt active-no" id="disc-no" onclick="setToggle('disc','NE')">NE</button>
-            </div>
-            <input type="hidden" id="f-discount" value="NE" />
-          </div>
         </div>
 
         <div id="pricePreview" class="price-preview" style="display:none">
@@ -934,7 +926,6 @@
               <th>Polog (€)</th>
               <th>Plaćeno</th>
               <th>Prodavač</th>
-              <th>Popust</th>
               <th class="sortable" onclick="sortTable('totalPrice')">Ukupno (€)</th>
               <th class="sortable" onclick="sortTable('commission')">Provizija (€)</th>
               <th id="colDateBuking">Datum bukinga</th>
@@ -1155,14 +1146,6 @@
             <button type="button" class="toggle-opt active-no" id="e-paid-no" onclick="setToggleEdit('paid','NE')">NE</button>
           </div>
           <input type="hidden" id="e-paid" value="NE" />
-        </div>
-        <div class="form-group">
-          <label>Popust</label>
-          <div class="toggle-wrap">
-            <button type="button" class="toggle-opt" id="e-disc-yes" onclick="setToggleEdit('disc','DA')">DA</button>
-            <button type="button" class="toggle-opt active-no" id="e-disc-no" onclick="setToggleEdit('disc','NE')">NE</button>
-          </div>
-          <input type="hidden" id="e-discount" value="NE" />
         </div>
       </div>
 
@@ -1520,7 +1503,7 @@ function adjustCounter(id, delta) {
 /* ── Toggles ─────────────────────────────────────────────── */
 function setToggle(name, val) {
   const p = name==='paid' ? 'paid' : 'disc';
-  const f = name==='paid' ? 'f-paid' : 'f-discount';
+  const f = 'f-paid';
   document.getElementById(f).value = val;
   document.getElementById(`${p}-yes`).className = 'toggle-opt'+(val==='DA'?' active-yes':'');
   document.getElementById(`${p}-no`).className  = 'toggle-opt'+(val==='NE'?' active-no':'');
@@ -1529,7 +1512,7 @@ function setToggle(name, val) {
 
 function setToggleEdit(name, val) {
   const p = name==='paid' ? 'e-paid' : 'e-disc';
-  const f = name==='paid' ? 'e-paid' : 'e-discount';
+  const f = 'e-paid';
   document.getElementById(f).value = val;
   document.getElementById(`${p}-yes`).className = 'toggle-opt'+(val==='DA'?' active-yes':'');
   document.getElementById(`${p}-no`).className  = 'toggle-opt'+(val==='NE'?' active-no':'');
@@ -1541,14 +1524,13 @@ function updatePricePreview() {
   const adults   = parseInt(document.getElementById('f-adults')?.value)||0;
   const children = parseInt(document.getElementById('f-children')?.value)||0;
   const deposit  = parseFloat(document.getElementById('f-deposit')?.value)||0;
-  const discount = document.getElementById('f-discount')?.value==='DA';
   if (!exc) { document.getElementById('pricePreview').style.display='none'; return; }
 
   const p        = prices[exc]||{adult:0,child:0,type:'person'};
   const fixed    = p.type === 'fixed';
   const basePrice= calcTotal(exc, adults, children);
   const total    = basePrice + deposit;
-  const comm     = total*(discount?.15:.25);
+  const comm     = calcComm(total);
 
   document.getElementById('pricePreview').style.display='flex';
   document.getElementById('previewTotal').textContent = fmtEur(total);
@@ -1558,7 +1540,7 @@ function updatePricePreview() {
     ? `🚢 Fiksna cijena broda ${fmtEur(basePrice)}`
     : `${adults} odraslih × ${fmtEur(p.adult)} + ${children} djece × ${fmtEur(p.child)}`;
   document.getElementById('previewBreakdown').textContent =
-    `${baseText} + polog ${fmtEur(deposit)} | Provizija: ${discount?'15%':'25%'}`;
+    `${baseText} + polog ${fmtEur(deposit)} | Provizija: 25%`;
 
   const hint = document.getElementById('fixedPriceHint');
   if (hint) hint.style.display = fixed ? 'flex' : 'none';
@@ -1574,7 +1556,7 @@ function calcTotal(exc,adults,children) {
 function isFixedPrice(exc) {
   return (prices[exc]||{}).type === 'fixed';
 }
-function calcComm(total,discount) { return total*(discount==='DA'?.15:.25); }
+function calcComm(total) { return total * 0.25; }
 
 function getMjesec(dateStr) {
   if (!dateStr) return '';
@@ -1601,7 +1583,6 @@ async function submitBooking(e) {
   const adults   = parseInt(document.getElementById('f-adults').value)||0;
   const children = parseInt(document.getElementById('f-children').value)||0;
   const deposit  = parseFloat(document.getElementById('f-deposit').value)||0;
-  const discount = document.getElementById('f-discount').value;
   const total    = calcTotal(exc,adults,children) + deposit;
 
   const booking = {
@@ -1619,9 +1600,8 @@ async function submitBooking(e) {
     deposit,
     paid:       document.getElementById('f-paid').value,
     seller:     document.getElementById('f-seller').value,
-    discount,
     totalPrice: total,
-    commission: calcComm(total,discount),
+    commission: calcComm(total),
     cancelled:  false,
     createdAt:  new Date().toISOString()
   };
@@ -1744,7 +1724,6 @@ function renderTable() {
         <td>${fmtEur(b.deposit)}</td>
         <td><span class="badge ${b.paid==='DA'?'badge-yes':'badge-no'}">${b.paid}</span></td>
         <td><span class="badge badge-seller">${esc(b.seller)}</span></td>
-        <td><span class="badge ${b.discount==='DA'?'badge-yes':'badge-no'}">${b.discount}</span></td>
         <td style="font-weight:800;color:${isFixedPrice(b.excursion)?'#7C3AED':'var(--pri)'}">
           ${isFixedPrice(b.excursion)?'<span title="Fiksna cijena broda">🚢</span> ':''}${fmtEur(b.totalPrice)}
         </td>
@@ -1802,7 +1781,6 @@ function openEdit(id) {
     document.getElementById(`e-${m}-disp`).textContent=val;
   });
   setToggleEdit('paid', b.paid||'NE');
-  setToggleEdit('disc', b.discount||'NE');
   renderSelects();
   document.getElementById('e-excursion').value = b.excursion||'';
   document.getElementById('e-seller').value    = b.seller   ||'';
@@ -1815,7 +1793,6 @@ async function saveEdit(e) {
   const adults   = parseInt(document.getElementById('e-adults').value)||0;
   const children = parseInt(document.getElementById('e-children').value)||0;
   const deposit  = parseFloat(document.getElementById('e-deposit').value)||0;
-  const discount = document.getElementById('e-discount').value;
   const total    = calcTotal(exc,adults,children) + deposit;
   const updated  = {
     name:       document.getElementById('e-name').value.trim(),
@@ -1832,7 +1809,7 @@ async function saveEdit(e) {
     deposit,
     paid:       document.getElementById('e-paid').value,
     seller:     document.getElementById('e-seller').value,
-    discount, totalPrice:total, commission:calcComm(total,discount)
+    totalPrice:total, commission:calcComm(total)
   };
   try {
     await db.ref(`bookings/${editingId}`).update(updated);
@@ -1873,7 +1850,7 @@ function exportToSheets() {
   const headers = [
     'Ime i prezime','Mobitel','Izlet','Mjesto polaska','Vrijeme polaska','Datum','Mjesec','Tjedan',
     'Odrasli','Djeca','Gratis','Riba','Meso','Vege',
-    'Polog (€)','Plaćeno','Prodavač','Popust','Otkazano',
+    'Polog (€)','Plaćeno','Prodavač','Otkazano',
     'Ukupno (€)','Provizija (€)','Datum bukinga'
   ];
 
@@ -1882,7 +1859,7 @@ function exportToSheets() {
     b.date||'', getMjesec(b.date), getTjedan(b.date),
     b.adults||0, b.children||0, b.free||0,
     b.menuRiba||0, b.menuMeso||0, b.menuVege||0,
-    b.deposit||0, b.paid||'', b.seller||'', b.discount||'',
+    b.deposit||0, b.paid||'', b.seller||'',
     b.cancelled ? 'DA' : 'NE',
     b.totalPrice||0, b.commission||0,
     fmtDateTime(b.createdAt)
