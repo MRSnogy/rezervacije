@@ -498,7 +498,7 @@
       width:600px; height:628px;
       background:linear-gradient(160deg,#7DC8D8 0%,#A8DDE8 35%,#6BBFCF 70%,#8CD4E0 100%);
       padding:16px;
-      font-family:'Oswald',Impact,sans-serif;
+      font-family:'Oswald',Arial,Impact,sans-serif;
       box-sizing:border-box;
       position:relative;
       overflow:hidden;
@@ -2021,42 +2021,55 @@ function generateCard(bookingId) {
       </svg>`);
   }
 
-  // Show card wrap temporarily, capture, hide
+  // Prikaži karticu vidljivo ali pokriveno — html2canvas zahtijeva
+  // da element bude stvarno renderiran u DOM-u
   const wrap = document.getElementById('cardWrap');
-  wrap.style.left   = '0';
-  wrap.style.top    = '0';
-  wrap.style.zIndex = '-1';
-  wrap.style.opacity = '0';
-  wrap.style.pointerEvents = 'none';
+  wrap.style.cssText = `
+    position: fixed;
+    left: 0; top: 0;
+    width: 600px;
+    z-index: 99999;
+    pointer-events: none;
+    clip: rect(0,0,0,0);
+    clip-path: inset(0 0 100% 0);
+  `;
 
-  // Wait for image to load then capture
-  const capture = () => {
-    html2canvas(document.getElementById('bookingCard'), {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: null,
-      logging: false
-    }).then(canvas => {
-      wrap.style.left = '-9999px';
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-      document.getElementById('cardPreviewImg').src = dataUrl;
-      // Store for download
-      document.getElementById('cardPreviewModal')._dataUrl = dataUrl;
-      document.getElementById('cardPreviewModal')._filename = `rezervacija_${b.name?.replace(/\s/g,'_')}_${b.date}.jpg`;
-      document.getElementById('cardPreviewModal').classList.add('open');
-    }).catch(err => {
-      wrap.style.left = '-9999px';
-      console.error(err);
-      toast('Greška pri generiranju kartice', 'error');
-    });
+  toast('Generiranje kartice…', '');
+
+  const doCapture = () => {
+    // Mali timeout da browser završi render fonta i slike
+    setTimeout(() => {
+      html2canvas(document.getElementById('bookingCard'), {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#A8DDE8',
+        logging: false,
+        imageTimeout: 0,
+        removeContainer: true
+      }).then(canvas => {
+        // Sakrij wrap
+        wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:600px;';
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        document.getElementById('cardPreviewImg').src = dataUrl;
+        document.getElementById('cardPreviewModal')._dataUrl = dataUrl;
+        document.getElementById('cardPreviewModal')._filename =
+          `rezervacija_${(b.name||'').replace(/\s/g,'_')}_${b.date}.jpg`;
+        document.getElementById('cardPreviewModal').classList.add('open');
+      }).catch(err => {
+        wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:600px;';
+        console.error('html2canvas greška:', err);
+        toast('Greška pri generiranju kartice', 'error');
+      });
+    }, 300);
   };
 
-  if (img.complete && img.naturalHeight > 0) {
-    capture();
+  const img = document.getElementById('card-boat-img');
+  if (!img.src || img.complete) {
+    doCapture();
   } else {
-    img.onload  = capture;
-    img.onerror = capture; // proceed even if image fails
+    img.onload  = doCapture;
+    img.onerror = doCapture;
   }
 }
 
