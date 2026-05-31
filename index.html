@@ -371,7 +371,7 @@
       text-transform:uppercase; letter-spacing:.5px;
       color:var(--txt-md); border-bottom:2px solid var(--border);
     }
-    .price-table td { padding:10px 12px; border-bottom:1px solid var(--border); }
+    .price-table td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
     .price-table tr:last-child td { border-bottom:none; }
     .price-input {
       padding:8px 10px; border:1.5px solid var(--border);
@@ -381,6 +381,23 @@
     }
     .price-input:focus { outline:none; border-color:var(--pri); background:#fff; }
     .exc-name-cell { font-weight:700; font-size:13px; }
+
+    /* Price type toggle */
+    .type-toggle { display:flex; gap:3px; background:var(--bg2); border-radius:var(--r-pill); padding:3px; border:1.5px solid var(--border); width:fit-content; }
+    .type-btn {
+      padding:5px 11px; border-radius:var(--r-pill);
+      font-size:11px; font-weight:700; cursor:pointer;
+      border:none; background:transparent; color:var(--txt-md);
+      transition:all var(--tr); white-space:nowrap;
+    }
+    .type-btn.active-person { background:var(--pri); color:#fff; }
+    .type-btn.active-fixed  { background:#7C3AED; color:#fff; }
+    .badge-fixed { background:#EDE9FE; color:#7C3AED; font-size:11px; }
+    .fixed-price-note {
+      font-size:11px; color:#7C3AED; font-weight:600;
+      background:#EDE9FE; padding:3px 8px; border-radius:var(--r-pill);
+      display:inline-block;
+    }
     .btn-del-row {
       padding:5px 9px; border-radius:var(--r-sm);
       background:#FDEAEA; color:var(--danger);
@@ -543,6 +560,10 @@
               <button type="button" onclick="quickAddExcursion()">+ Dodaj</button>
             </div>
             <button type="button" class="btn-link" onclick="toggleAddExcRow()">+ Dodaj novi izlet</button>
+            <div id="fixedPriceHint" style="display:none;align-items:center;gap:8px;margin-top:6px;padding:8px 12px;background:#EDE9FE;border-radius:var(--r-sm)">
+              <span style="font-size:16px">🚢</span>
+              <span style="font-size:12px;color:#7C3AED;font-weight:700">Fiksna cijena — iznajmljuje se cijeli brod. Broj osoba se bilježi ali ne utječe na cijenu.</span>
+            </div>
           </div>
 
           <div class="form-group">
@@ -779,12 +800,18 @@
           <thead>
             <tr>
               <th>Izlet</th>
-              <th>Cijena odrasli (€)</th>
-              <th>Cijena djeca (€)</th>
+              <th>Vrsta cijene</th>
+              <th id="th-adult">Cijena odrasli (€)</th>
+              <th id="th-child">Cijena djeca (€)</th>
+              <th id="th-fixed">Fiksna cijena (€)</th>
             </tr>
           </thead>
           <tbody id="priceTableBody"></tbody>
         </table>
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;background:var(--bg2);border-radius:var(--r);font-size:12px;color:var(--txt-md)">
+        💡 <strong>Po osobi:</strong> ukupno = odrasli × cijena + djeca × cijena &nbsp;|&nbsp;
+        <span style="color:#7C3AED">🚢 <strong>Fiksna cijena:</strong> iznajmljuje se cijeli brod za jednu fiksnu cifru</span>
       </div>
       <button class="btn-save-all" onclick="savePrices()">Spremi cijene</button>
     </div>
@@ -1059,20 +1086,63 @@ function renderPriceTable() {
   const tbody = document.getElementById('priceTableBody');
   if (!tbody) return;
   tbody.innerHTML = excursions.map(exc => {
-    const p = prices[exc] || { adult:0, child:0 };
-    return `<tr>
+    const p      = prices[exc] || { adult:0, child:0, type:'person' };
+    const isFixed = p.type === 'fixed';
+    const sid    = safeId(exc);
+    return `<tr id="ptr-${sid}">
       <td class="exc-name-cell">${esc(exc)}</td>
-      <td><input class="price-input" type="number" min="0" step="0.01" id="pa-${safeId(exc)}" value="${p.adult||0}" /></td>
-      <td><input class="price-input" type="number" min="0" step="0.01" id="pc-${safeId(exc)}" value="${p.child||0}" /></td>
+      <td>
+        <div class="type-toggle">
+          <button type="button" class="type-btn ${!isFixed?'active-person':''}"
+            onclick="setPriceType('${sid}','person')">👥 Po osobi</button>
+          <button type="button" class="type-btn ${isFixed?'active-fixed':''}"
+            onclick="setPriceType('${sid}','fixed')">🚢 Fiksna</button>
+        </div>
+      </td>
+      <td id="td-adult-${sid}" ${isFixed?'style="opacity:.3;pointer-events:none"':''}>
+        <input class="price-input" type="number" min="0" step="0.01"
+          id="pa-${sid}" value="${p.adult||0}" />
+      </td>
+      <td id="td-child-${sid}" ${isFixed?'style="opacity:.3;pointer-events:none"':''}>
+        <input class="price-input" type="number" min="0" step="0.01"
+          id="pc-${sid}" value="${p.child||0}" />
+      </td>
+      <td id="td-fixed-${sid}" ${!isFixed?'style="opacity:.3;pointer-events:none"':''}>
+        <input class="price-input" type="number" min="0" step="0.01"
+          id="pf-${sid}" value="${p.fixed||0}"
+          style="width:120px;${isFixed?'border-color:#7C3AED;box-shadow:0 0 0 3px rgba(124,58,237,.1)':''}" />
+      </td>
     </tr>`;
   }).join('');
 }
 
+function setPriceType(sid, type) {
+  const isFixed = type === 'fixed';
+  // Update button styles
+  const row = document.getElementById(`ptr-${sid}`);
+  const btns = row.querySelectorAll('.type-btn');
+  btns[0].className = 'type-btn ' + (!isFixed ? 'active-person' : '');
+  btns[1].className = 'type-btn ' + (isFixed  ? 'active-fixed'  : '');
+  // Toggle cell opacity
+  document.getElementById(`td-adult-${sid}`).style.cssText = isFixed  ? 'opacity:.3;pointer-events:none' : '';
+  document.getElementById(`td-child-${sid}`).style.cssText = isFixed  ? 'opacity:.3;pointer-events:none' : '';
+  const fixedCell  = document.getElementById(`td-fixed-${sid}`);
+  const fixedInput = document.getElementById(`pf-${sid}`);
+  fixedCell.style.cssText  = !isFixed ? 'opacity:.3;pointer-events:none' : '';
+  fixedInput.style.cssText = isFixed  ? 'width:120px;border-color:#7C3AED;box-shadow:0 0 0 3px rgba(124,58,237,.1)' : 'width:120px';
+  // Store type temporarily on the element
+  row.dataset.type = type;
+}
+
 function savePrices() {
   excursions.forEach(exc => {
-    const a = parseFloat(document.getElementById(`pa-${safeId(exc)}`)?.value)||0;
-    const c = parseFloat(document.getElementById(`pc-${safeId(exc)}`)?.value)||0;
-    prices[exc] = { adult:a, child:c };
+    const sid  = safeId(exc);
+    const row  = document.getElementById(`ptr-${sid}`);
+    const type = row?.dataset.type || (prices[exc]?.type || 'person');
+    const a    = parseFloat(document.getElementById(`pa-${sid}`)?.value)||0;
+    const c    = parseFloat(document.getElementById(`pc-${sid}`)?.value)||0;
+    const f    = parseFloat(document.getElementById(`pf-${sid}`)?.value)||0;
+    prices[exc] = { adult:a, child:c, fixed:f, type };
   });
   db.ref('config/prices').set(prices)
     .then(()=>toast('Cijene su spremljene! ✓','success'))
@@ -1205,20 +1275,33 @@ function updatePricePreview() {
   const children = parseInt(document.getElementById('f-children')?.value)||0;
   const discount = document.getElementById('f-discount')?.value==='DA';
   if (!exc) { document.getElementById('pricePreview').style.display='none'; return; }
-  const p        = prices[exc]||{adult:0,child:0};
-  const total    = adults*p.adult + children*p.child;
-  const comm     = total*(discount?.15:.25);
+
+  const p     = prices[exc]||{adult:0,child:0,type:'person'};
+  const fixed = p.type === 'fixed';
+  const total = calcTotal(exc, adults, children);
+  const comm  = total*(discount?.15:.25);
+
   document.getElementById('pricePreview').style.display='flex';
   document.getElementById('previewTotal').textContent = fmtEur(total);
   document.getElementById('previewComm').textContent  = fmtEur(comm);
-  document.getElementById('previewBreakdown').textContent =
-    `${adults} odraslih × ${fmtEur(p.adult)} + ${children} djece × ${fmtEur(p.child)} | Provizija: ${discount?'15%':'25%'}`;
+  document.getElementById('previewBreakdown').textContent = fixed
+    ? `🚢 Fiksna cijena broda | Provizija: ${discount?'15%':'25%'}`
+    : `${adults} odraslih × ${fmtEur(p.adult)} + ${children} djece × ${fmtEur(p.child)} | Provizija: ${discount?'15%':'25%'}`;
+
+  // Show/hide adult-children count rows visually (still kept for records)
+  const hint = document.getElementById('fixedPriceHint');
+  if (hint) hint.style.display = fixed ? 'flex' : 'none';
 }
 
 /* ── Calculations ────────────────────────────────────────── */
 function calcTotal(exc,adults,children) {
-  const p = prices[exc]||{adult:0,child:0};
+  const p = prices[exc]||{adult:0,child:0,type:'person'};
+  if (p.type === 'fixed') return p.fixed||0;
   return adults*p.adult + children*p.child;
+}
+
+function isFixedPrice(exc) {
+  return (prices[exc]||{}).type === 'fixed';
 }
 function calcComm(total,discount) { return total*(discount==='DA'?.15:.25); }
 
@@ -1388,7 +1471,9 @@ function renderTable() {
         <td><span class="badge ${b.paid==='DA'?'badge-yes':'badge-no'}">${b.paid}</span></td>
         <td><span class="badge badge-seller">${esc(b.seller)}</span></td>
         <td><span class="badge ${b.discount==='DA'?'badge-yes':'badge-no'}">${b.discount}</span></td>
-        <td style="font-weight:800;color:var(--pri)">${fmtEur(b.totalPrice)}</td>
+        <td style="font-weight:800;color:${isFixedPrice(b.excursion)?'#7C3AED':'var(--pri)'}">
+          ${isFixedPrice(b.excursion)?'<span title="Fiksna cijena broda">🚢</span> ':''}${fmtEur(b.totalPrice)}
+        </td>
         <td style="font-weight:700;color:var(--acc-dk)">${fmtEur(b.commission)}</td>
         ${dateBukingCell}
         <td style="display:flex;gap:4px;flex-wrap:wrap">
