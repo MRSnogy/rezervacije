@@ -523,10 +523,18 @@
     }
     .card-top span {
       color:#fff;
-      font-size:28px;
+      font-size:22px;
       font-weight:700;
-      letter-spacing:2px;
+      letter-spacing:1.5px;
       text-shadow:0 2px 6px rgba(0,60,80,.5);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:180px;
+    }
+    .card-top span:nth-child(2) {
+      font-size:24px;
+      max-width:none;
     }
     .card-middle {
       display:flex;
@@ -728,8 +736,13 @@
           </div>
 
           <div class="form-group">
-            <label>Polazak</label>
-            <input class="form-input" type="text" id="f-departure" placeholder="Split - 09:00" />
+            <label>Mjesto polaska</label>
+            <input class="form-input" type="text" id="f-dep-place" placeholder="npr. Split - Riva" />
+          </div>
+
+          <div class="form-group">
+            <label>Vrijeme polaska</label>
+            <input class="form-input" type="time" id="f-dep-time" />
           </div>
 
           <div class="form-group">
@@ -907,7 +920,8 @@
               <th class="sortable" onclick="sortTable('name')">Ime i prezime</th>
               <th>Mobitel</th>
               <th class="sortable" onclick="sortTable('excursion')">Izlet</th>
-              <th>Polazak</th>
+              <th>Mjesto polaska</th>
+              <th>Vrijeme</th>
               <th class="sortable" onclick="sortTable('date')">Datum</th>
               <th>Mj.</th>
               <th>Tjedan</th>
@@ -1057,8 +1071,12 @@
           </div>
         </div>
         <div class="form-group">
-          <label>Polazak</label>
-          <input class="form-input" type="text" id="e-departure" />
+          <label>Mjesto polaska</label>
+          <input class="form-input" type="text" id="e-dep-place" placeholder="npr. Split - Riva" />
+        </div>
+        <div class="form-group">
+          <label>Vrijeme polaska</label>
+          <input class="form-input" type="time" id="e-dep-time" />
         </div>
         <div class="form-group">
           <label>Datum</label>
@@ -1149,7 +1167,7 @@
 <div id="cardWrap">
   <div id="bookingCard">
     <div class="card-top">
-      <span id="card-num">#1</span>
+      <span id="card-client">ANA HORVAT</span>
       <span id="card-date">28.07.2026.</span>
       <span id="card-time">08:30H</span>
     </div>
@@ -1581,7 +1599,8 @@ async function submitBooking(e) {
     name:       document.getElementById('f-name').value.trim(),
     phone:      document.getElementById('f-phone').value.trim(),
     excursion:  exc,
-    departure:  document.getElementById('f-departure').value.trim(),
+    depPlace:   document.getElementById('f-dep-place').value.trim(),
+    depTime:    document.getElementById('f-dep-time').value,
     date:       document.getElementById('f-date').value,
     adults, children,
     free:       parseInt(document.getElementById('f-free').value)||0,
@@ -1702,7 +1721,8 @@ function renderTable() {
         <td style="font-weight:700">${esc(b.name)}${b.cancelled?` <span class="badge badge-cancel">OTKAZANO</span>`:''}</td>
         <td>${esc(b.phone)}</td>
         <td><span class="badge badge-exc">${esc(b.excursion)}</span></td>
-        <td>${esc(b.departure)}</td>
+        <td>${esc(b.depPlace||b.departure||'')}</td>
+        <td style="font-weight:600;color:var(--pri)">${b.depTime||''}</td>
         <td style="font-weight:600">${fmtDate(b.date)}</td>
         <td style="text-transform:capitalize">${getMjesec(b.date)}</td>
         <td style="font-size:11px;color:var(--txt-md)">${getTjedan(b.date)}</td>
@@ -1760,7 +1780,8 @@ function openEdit(id) {
   editingId=id;
   document.getElementById('e-name').value      = b.name      ||'';
   document.getElementById('e-phone').value     = b.phone     ||'';
-  document.getElementById('e-departure').value = b.departure ||'';
+  document.getElementById('e-dep-place').value = b.depPlace || b.departure || '';
+  document.getElementById('e-dep-time').value  = b.depTime  || '';
   document.getElementById('e-date').value      = b.date      ||'';
   document.getElementById('e-adults').value    = b.adults    ||0;
   document.getElementById('e-children').value  = b.children  ||0;
@@ -1791,7 +1812,8 @@ async function saveEdit(e) {
     name:       document.getElementById('e-name').value.trim(),
     phone:      document.getElementById('e-phone').value.trim(),
     excursion:  exc,
-    departure:  document.getElementById('e-departure').value.trim(),
+    depPlace:   document.getElementById('e-dep-place').value.trim(),
+    depTime:    document.getElementById('e-dep-time').value,
     date:       document.getElementById('e-date').value,
     adults, children,
     free:       parseInt(document.getElementById('e-free').value)||0,
@@ -1840,14 +1862,14 @@ function showTab(name) {
 /* ── Export to Google Sheets (.xlsx) ─────────────────────── */
 function exportToSheets() {
   const headers = [
-    'Ime i prezime','Mobitel','Izlet','Polazak','Datum','Mjesec','Tjedan',
+    'Ime i prezime','Mobitel','Izlet','Mjesto polaska','Vrijeme polaska','Datum','Mjesec','Tjedan',
     'Odrasli','Djeca','Gratis','Riba','Meso','Vege',
     'Polog (€)','Plaćeno','Prodavač','Popust','Otkazano',
     'Ukupno (€)','Provizija (€)','Datum bukinga'
   ];
 
   const rows = bookings.map(b => [
-    b.name||'', b.phone||'', b.excursion||'', b.departure||'',
+    b.name||'', b.phone||'', b.excursion||'', b.depPlace||b.departure||'', b.depTime||'',
     b.date||'', getMjesec(b.date), getTjedan(b.date),
     b.adults||0, b.children||0, b.free||0,
     b.menuRiba||0, b.menuMeso||0, b.menuVege||0,
@@ -1957,9 +1979,9 @@ function generateCard(bookingId) {
   const num = sorted.findIndex(x => x.id === bookingId) + 1;
 
   // Populate card fields
-  document.getElementById('card-num').textContent     = `#${num}`;
+  document.getElementById('card-client').textContent  = (b.name||'').toUpperCase();
   document.getElementById('card-date').textContent    = fmtDate(b.date);
-  document.getElementById('card-time').textContent    = b.departure ? b.departure.split(' ').pop().toUpperCase().replace(':','H').replace('H','H') : '—';
+  document.getElementById('card-time').textContent    = b.depTime ? b.depTime + 'H' : (b.departure||'—').split(' ').pop().toUpperCase();
   document.getElementById('card-exc').textContent     = (b.excursion||'').toUpperCase();
   document.getElementById('card-people').textContent  = `PEOPLE: ${b.adults||0}-${b.children||0}-${b.free||0}`;
   document.getElementById('card-total').textContent   = `TOTAL: ${Math.round(b.totalPrice||0)}€`;
