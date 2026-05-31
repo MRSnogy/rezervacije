@@ -7,6 +7,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg:        #FDFBF7;
@@ -487,6 +489,165 @@
     }
     @keyframes spin { to{transform:rotate(360deg)} }
 
+    /* ── Booking Card ────────────────────────────────────────── */
+    #cardWrap {
+      position:fixed; left:-9999px; top:0; z-index:-1;
+      width:600px;
+    }
+    #bookingCard {
+      width:600px; height:628px;
+      background:linear-gradient(160deg,#7DC8D8 0%,#A8DDE8 35%,#6BBFCF 70%,#8CD4E0 100%);
+      padding:16px;
+      font-family:'Oswald',Impact,sans-serif;
+      box-sizing:border-box;
+      position:relative;
+      overflow:hidden;
+    }
+    /* watermark texture overlay */
+    #bookingCard::before {
+      content:'';
+      position:absolute;inset:0;
+      background:radial-gradient(ellipse at 20% 50%,rgba(255,255,255,.18) 0%,transparent 60%),
+                 radial-gradient(ellipse at 80% 20%,rgba(255,255,255,.12) 0%,transparent 50%);
+      pointer-events:none;
+    }
+    .card-top {
+      border:3px solid rgba(255,255,255,.9);
+      border-radius:6px;
+      padding:10px 20px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:13px;
+      background:rgba(0,100,130,.15);
+    }
+    .card-top span {
+      color:#fff;
+      font-size:28px;
+      font-weight:700;
+      letter-spacing:2px;
+      text-shadow:0 2px 6px rgba(0,60,80,.5);
+    }
+    .card-middle {
+      display:flex;
+      gap:12px;
+      height:430px;
+    }
+    .card-img-side {
+      flex:1.1;
+      position:relative;
+      border:3px solid rgba(255,255,255,.85);
+      border-radius:6px;
+      overflow:hidden;
+    }
+    .card-img-side img {
+      width:100%; height:100%;
+      object-fit:cover;
+      display:block;
+    }
+    .card-boat-name {
+      position:absolute;
+      top:12px; left:0; right:0;
+      text-align:center;
+      color:#fff;
+      font-size:30px;
+      font-weight:700;
+      letter-spacing:3px;
+      text-shadow:0 2px 8px rgba(0,0,0,.75),0 0 20px rgba(0,0,0,.4);
+    }
+    .card-info-side {
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .card-info-item {
+      flex:1;
+      border:2.5px solid rgba(255,255,255,.85);
+      border-radius:6px;
+      background:rgba(0,100,130,.12);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:0 10px;
+    }
+    .card-info-item span {
+      color:#fff;
+      font-size:21px;
+      font-weight:700;
+      letter-spacing:1.5px;
+      text-align:center;
+      text-shadow:0 1px 4px rgba(0,60,80,.5);
+      line-height:1.2;
+    }
+    .card-info-item.card-exc span {
+      font-size:19px;
+      letter-spacing:2px;
+    }
+    .card-bottom {
+      margin-top:13px;
+      background:rgba(0,80,110,.5);
+      border-radius:6px;
+      padding:11px 20px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      border:2px solid rgba(255,255,255,.4);
+    }
+    .card-bottom span {
+      color:#fff;
+      font-size:18px;
+      font-weight:700;
+      letter-spacing:1px;
+      text-shadow:0 1px 4px rgba(0,0,0,.4);
+      display:flex;
+      align-items:center;
+      gap:7px;
+    }
+
+    /* Card preview modal */
+    #cardPreviewModal .modal-box {
+      text-align:center;
+      max-width:680px;
+    }
+    #cardPreviewImg {
+      width:100%; border-radius:12px;
+      box-shadow:0 8px 32px rgba(0,0,0,.2);
+      margin-bottom:16px;
+    }
+    .btn-download {
+      display:inline-flex; align-items:center; gap:8px;
+      padding:14px 32px;
+      background:linear-gradient(135deg,#1A7A6E,#2DB8A8);
+      color:#fff; border-radius:var(--r-pill);
+      font-size:16px; font-weight:800;
+      box-shadow:0 6px 20px rgba(26,122,110,.35);
+      transition:all var(--tr);
+    }
+    .btn-download:hover { transform:translateY(-2px); }
+    .btn-gen {
+      padding:5px 9px; border-radius:8px;
+      font-size:11px; font-weight:600;
+      background:#FFF8E8; color:#B55E0A;
+      transition:all var(--tr);
+    }
+    .btn-gen:hover { background:#F4A261; color:#fff; }
+
+    /* Image upload in settings */
+    .img-upload-wrap {
+      border:2px dashed var(--border); border-radius:var(--r);
+      padding:20px; text-align:center; cursor:pointer;
+      transition:all var(--tr); margin-bottom:12px;
+      background:var(--bg2);
+    }
+    .img-upload-wrap:hover { border-color:var(--pri); background:#F0FAF8; }
+    .img-upload-wrap input { display:none; }
+    .img-preview-thumb {
+      width:100%; max-height:160px; object-fit:cover;
+      border-radius:var(--r-sm); margin-top:10px;
+      display:none;
+    }
+
     /* ── Mobile overrides ────────────────────────────────────── */
     @media(max-width:600px) {
       .form-grid { grid-template-columns:1fr; }
@@ -791,6 +952,7 @@
       <button class="modal-tab active" onclick="switchTab('tabCijene')">💰 Cijene</button>
       <button class="modal-tab" onclick="switchTab('tabIzleti')">🗺️ Izleti</button>
       <button class="modal-tab" onclick="switchTab('tabProdavaci')">👥 Prodavači</button>
+      <button class="modal-tab" onclick="switchTab('tabKartica')">🎫 Kartica</button>
     </div>
 
     <!-- TAB: Cijene -->
@@ -834,6 +996,37 @@
         <input type="text" id="newSellerName" placeholder="Ime prodavača" />
         <button class="btn-add" onclick="addSeller()">+ Dodaj</button>
       </div>
+    </div>
+
+    <!-- TAB: Kartica -->
+    <div id="tabKartica" class="modal-tab-content">
+      <div class="form-grid" style="margin-bottom:16px">
+        <div class="form-group">
+          <label>Naziv broda</label>
+          <input class="form-input" type="text" id="cfg-boat-name" placeholder="BOAT MURTER" value="BOAT MURTER" />
+        </div>
+        <div class="form-group">
+          <label>Facebook naziv</label>
+          <input class="form-input" type="text" id="cfg-fb-name" placeholder="TAKE ME TO CROATIA" value="TAKE ME TO CROATIA" />
+        </div>
+        <div class="form-group full">
+          <label>WhatsApp broj</label>
+          <input class="form-input" type="text" id="cfg-wa-num" placeholder="+385976440910" value="+385976440910" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Slika broda</label>
+        <label class="img-upload-wrap" for="boatImgInput">
+          <div id="uploadPrompt">
+            <div style="font-size:32px;margin-bottom:6px">🚢</div>
+            <div style="font-weight:700;color:var(--txt-md)">Kliknite za upload slike broda</div>
+            <div style="font-size:12px;color:var(--txt-lt);margin-top:4px">JPG, PNG — preporučeno min. 600×400px</div>
+          </div>
+          <img id="boatImgThumb" class="img-preview-thumb" src="" alt="preview" />
+          <input type="file" id="boatImgInput" accept="image/*" onchange="handleBoatImage(event)" />
+        </label>
+      </div>
+      <button class="btn-save-all" onclick="saveCardConfig()">Spremi postavke kartice</button>
     </div>
 
   </div>
@@ -949,6 +1142,53 @@
 
       <button type="submit" class="btn-submit">Spremi izmjene</button>
     </form>
+  </div>
+</div>
+
+<!-- ══ HIDDEN BOOKING CARD (za html2canvas) ═══════════════ -->
+<div id="cardWrap">
+  <div id="bookingCard">
+    <div class="card-top">
+      <span id="card-num">#1</span>
+      <span id="card-date">28.07.2026.</span>
+      <span id="card-time">08:30H</span>
+    </div>
+    <div class="card-middle">
+      <div class="card-img-side">
+        <img id="card-boat-img" src="" alt="boat" crossorigin="anonymous" />
+        <div class="card-boat-name" id="card-boat-name">BOAT MURTER</div>
+      </div>
+      <div class="card-info-side">
+        <div class="card-info-item card-exc"><span id="card-exc">HVAR I BRAČ</span></div>
+        <div class="card-info-item"><span id="card-people">PEOPLE: 2-1-0</span></div>
+        <div class="card-info-item"><span id="card-total">TOTAL: 150€</span></div>
+        <div class="card-info-item"><span id="card-deposit">DEPOSIT: 37€</span></div>
+        <div class="card-info-item"><span id="card-rest">REST: 113€</span></div>
+      </div>
+    </div>
+    <div class="card-bottom">
+      <span>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        <span id="card-fb">TAKE ME TO CROATIA</span>
+      </span>
+      <span>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        <span id="card-wa">+385976440910</span>
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CARD PREVIEW MODAL ═══════════════════════════════ -->
+<div class="modal-overlay" id="cardPreviewModal">
+  <div class="modal-box" id="cardPreviewBox">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeCardPreview()">✕</button>
+    <div class="modal-title">🎫 Kartica rezervacije</div>
+    <img id="cardPreviewImg" src="" alt="booking card" />
+    <a id="cardDownloadLink" download="rezervacija.jpg">
+      <button class="btn-download" onclick="downloadCard()">⬇ Preuzmi JPG</button>
+    </a>
   </div>
 </div>
 
@@ -1483,6 +1723,7 @@ function renderTable() {
         ${dateBukingCell}
         <td style="display:flex;gap:4px;flex-wrap:wrap">
           ${cancelBtn}
+          <button class="btn-table btn-gen"  onclick="generateCard('${b.id}')">🎫</button>
           <button class="btn-table btn-edit" onclick="openEdit('${b.id}')">✏️</button>
           <button class="btn-table btn-del"  onclick="confirmDelete('${b.id}')">🗑️</button>
         </td>
@@ -1652,21 +1893,173 @@ function toast(msg,type='') {
   toastT=setTimeout(()=>{el.className='';},3500);
 }
 
+/* ══════════════════════════════════════════════════════════
+   BOOKING CARD GENERATOR
+══════════════════════════════════════════════════════════ */
+
+// Card config — stored in localStorage
+let cardConfig = {
+  boatName: 'BOAT MURTER',
+  fbName:   'TAKE ME TO CROATIA',
+  waNum:    '+385976440910',
+  boatImg:  ''
+};
+
+function loadCardConfig() {
+  try {
+    const s = localStorage.getItem('cardConfig');
+    if (s) cardConfig = { ...cardConfig, ...JSON.parse(s) };
+  } catch(e){}
+  // Populate settings fields
+  const bn = document.getElementById('cfg-boat-name');
+  const fb = document.getElementById('cfg-fb-name');
+  const wa = document.getElementById('cfg-wa-num');
+  if (bn) bn.value = cardConfig.boatName;
+  if (fb) fb.value = cardConfig.fbName;
+  if (wa) wa.value = cardConfig.waNum;
+  // Show thumb if image saved
+  if (cardConfig.boatImg) {
+    const thumb = document.getElementById('boatImgThumb');
+    const prompt = document.getElementById('uploadPrompt');
+    if (thumb)  { thumb.src = cardConfig.boatImg; thumb.style.display = 'block'; }
+    if (prompt) prompt.style.display = 'none';
+  }
+}
+
+function handleBoatImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    cardConfig.boatImg = ev.target.result;
+    const thumb  = document.getElementById('boatImgThumb');
+    const prompt = document.getElementById('uploadPrompt');
+    if (thumb)  { thumb.src = cardConfig.boatImg; thumb.style.display = 'block'; }
+    if (prompt) prompt.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveCardConfig() {
+  cardConfig.boatName = document.getElementById('cfg-boat-name').value.trim() || 'BOAT MURTER';
+  cardConfig.fbName   = document.getElementById('cfg-fb-name').value.trim()   || 'TAKE ME TO CROATIA';
+  cardConfig.waNum    = document.getElementById('cfg-wa-num').value.trim()    || '+385976440910';
+  localStorage.setItem('cardConfig', JSON.stringify(cardConfig));
+  toast('Postavke kartice su spremljene! ✓', 'success');
+}
+
+function generateCard(bookingId) {
+  const b = bookings.find(x => x.id === bookingId);
+  if (!b) return;
+
+  // Sequential number among all bookings sorted by date
+  const sorted = [...bookings].sort((a,z) => (a.createdAt||'').localeCompare(z.createdAt||''));
+  const num = sorted.findIndex(x => x.id === bookingId) + 1;
+
+  // Populate card fields
+  document.getElementById('card-num').textContent     = `#${num}`;
+  document.getElementById('card-date').textContent    = fmtDate(b.date);
+  document.getElementById('card-time').textContent    = b.departure ? b.departure.split(' ').pop().toUpperCase().replace(':','H').replace('H','H') : '—';
+  document.getElementById('card-exc').textContent     = (b.excursion||'').toUpperCase();
+  document.getElementById('card-people').textContent  = `PEOPLE: ${b.adults||0}-${b.children||0}-${b.free||0}`;
+  document.getElementById('card-total').textContent   = `TOTAL: ${Math.round(b.totalPrice||0)}€`;
+  document.getElementById('card-deposit').textContent = `DEPOSIT: ${Math.round(b.deposit||0)}€`;
+  const rest = (b.totalPrice||0) - (b.deposit||0);
+  document.getElementById('card-rest').textContent    = `REST: ${Math.round(rest)}€`;
+  document.getElementById('card-boat-name').textContent = cardConfig.boatName.toUpperCase();
+  document.getElementById('card-fb').textContent      = cardConfig.fbName.toUpperCase();
+  document.getElementById('card-wa').textContent      = cardConfig.waNum;
+
+  // Boat image
+  const img = document.getElementById('card-boat-img');
+  if (cardConfig.boatImg) {
+    img.src = cardConfig.boatImg;
+  } else {
+    // Placeholder gradient if no image uploaded
+    img.src = 'data:image/svg+xml;base64,' + btoa(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="300" height="430">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#5BAFC0"/>
+          <stop offset="100%" stop-color="#2E8094"/>
+        </linearGradient></defs>
+        <rect width="300" height="430" fill="url(#g)"/>
+        <text x="150" y="200" text-anchor="middle" fill="rgba(255,255,255,0.4)"
+              font-size="16" font-family="sans-serif">Dodajte sliku broda</text>
+        <text x="150" y="225" text-anchor="middle" fill="rgba(255,255,255,0.4)"
+              font-size="13" font-family="sans-serif">⚙️ Postavke → Kartica</text>
+      </svg>`);
+  }
+
+  // Show card wrap temporarily, capture, hide
+  const wrap = document.getElementById('cardWrap');
+  wrap.style.left   = '0';
+  wrap.style.top    = '0';
+  wrap.style.zIndex = '-1';
+  wrap.style.opacity = '0';
+  wrap.style.pointerEvents = 'none';
+
+  // Wait for image to load then capture
+  const capture = () => {
+    html2canvas(document.getElementById('bookingCard'), {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: null,
+      logging: false
+    }).then(canvas => {
+      wrap.style.left = '-9999px';
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      document.getElementById('cardPreviewImg').src = dataUrl;
+      // Store for download
+      document.getElementById('cardPreviewModal')._dataUrl = dataUrl;
+      document.getElementById('cardPreviewModal')._filename = `rezervacija_${b.name?.replace(/\s/g,'_')}_${b.date}.jpg`;
+      document.getElementById('cardPreviewModal').classList.add('open');
+    }).catch(err => {
+      wrap.style.left = '-9999px';
+      console.error(err);
+      toast('Greška pri generiranju kartice', 'error');
+    });
+  };
+
+  if (img.complete && img.naturalHeight > 0) {
+    capture();
+  } else {
+    img.onload  = capture;
+    img.onerror = capture; // proceed even if image fails
+  }
+}
+
+function downloadCard() {
+  const modal = document.getElementById('cardPreviewModal');
+  const dataUrl   = modal._dataUrl;
+  const filename  = modal._filename || 'rezervacija.jpg';
+  if (!dataUrl) return;
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = filename;
+  a.click();
+}
+
+function closeCardPreview() {
+  document.getElementById('cardPreviewModal').classList.remove('open');
+}
+
 /* ── Close modals on overlay click + Esc ─────────────────── */
-['settingsModal','editModal'].forEach(id=>{
+['settingsModal','editModal','cardPreviewModal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){
     if(e.target===this) this.classList.remove('open');
   });
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
-    closeSettings(); closeEditModal(); closeConfirm();
+    closeSettings(); closeEditModal(); closeConfirm(); closeCardPreview();
   }
 });
 
 /* ── Start ───────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+  loadCardConfig();
   init();
 });
 </script>
