@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Rezervacije Izleta</title>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg:        #FDFBF7;
+      --bg2:       #F5F3EF;
+      --card:      #FFFFFF;
+      --pri:       #1A7A6E;
+      --pri-lt:    #2DB8A8;
+      --pri-dk:    #0F5C52;
+      --acc:       #F4A261;
+      --acc-dk:    #E08840;
+      --danger:    #E05555;
+      --success:   #27AE60;
+      --txt:       #1A1A2E;
+      --txt-md:    #4A4A6A;
+      --txt-lt:    #9A9AB0;
+      --border:    #E8E6E0;
+      --shadow:    0 4px 28px rgba(0,0,0,.07);
+      --shadow-lg: 0 12px 48px rgba(0,0,0,.13);
+      --r:     14px;
+      --r-sm:  10px;
+      --r-pill:50px;
+      --tr:    .2s ease;
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; -webkit-tap-highlight-color:transparent; }
+    body {
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;
+      background:var(--bg); color:var(--txt);
+      min-height:100vh; font-size:15px; line-height:1.6;
+    }
+    input,select,textarea,button { font:inherit; }
+    button { cursor:pointer; border:none; outline:none; }
+    select { appearance:none; -webkit-appearance:none; }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    header {
+      background:var(--card);
+      border-bottom:1px solid var(--border);
+      position:sticky; top:0; z-index:100;
+      box-shadow:0 2px 12px rgba(0,0,0,.06);
+    }
+    .header-inner {
+      max-width:1400px; margin:0 auto;
+      padding:0 16px; height:58px;
+      display:flex; align-items:center; gap:12px;
+    }
+    .logo {
+      font-size:18px; font-weight:800; color:var(--pri);
+      white-space:nowrap; display:flex; align-items:center; gap:6px;
+    }
+    .nav-tabs { display:flex; gap:3px; flex:1; }
+    .nav-tab {
+      padding:7px 14px; border-radius:var(--r-pill);
+      font-weight:600; font-size:13px; color:var(--txt-md);
+      background:transparent; transition:all var(--tr);
+      white-space:nowrap;
+    }
+    .nav-tab:hover { background:var(--bg2); }
+    .nav-tab.active { background:var(--pri); color:#fff; }
+    .header-right { display:flex; gap:8px; align-items:center; margin-left:auto; }
+    .live-dot {
+      width:8px; height:8px; border-radius:50%; background:#ccc; transition:background .3s;
+    }
+    .live-dot.online { background:var(--success); box-shadow:0 0 0 3px rgba(39,174,96,.2); }
+    .live-text { font-size:11px; color:var(--txt-lt); white-space:nowrap; }
+    .btn-settings {
+      display:flex; align-items:center; gap:5px;
+      padding:7px 13px; border-radius:var(--r-pill);
+      font-weight:600; font-size:13px;
+      background:var(--bg2); color:var(--txt-md);
+      border:1px solid var(--border); transition:all var(--tr);
+    }
+    .btn-settings:hover { background:var(--pri); color:#fff; border-color:var(--pri); }
+
+    /* ── Main ────────────────────────────────────────────────── */
+    main { max-width:1400px; margin:0 auto; padding:16px 12px 100px; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; animation:fadeUp .25s ease; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+
+    /* ── Form Card ───────────────────────────────────────────── */
+    .form-card {
+      background:var(--card); border-radius:20px;
+      box-shadow:var(--shadow); padding:20px 16px;
+      max-width:860px; margin:0 auto;
+    }
+    .form-card h2 { font-size:20px; font-weight:800; margin-bottom:20px; display:flex; align-items:center; gap:8px; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .form-group { display:flex; flex-direction:column; gap:6px; }
+    .form-group.full { grid-column:1/-1; }
+    .form-group label {
+      font-size:11px; font-weight:800; color:var(--txt-md);
+      text-transform:uppercase; letter-spacing:.5px;
+    }
+    .form-input,.form-select {
+      padding:13px 14px; border:1.5px solid var(--border);
+      border-radius:var(--r); background:var(--bg2);
+      color:var(--txt); font-size:15px; width:100%;
+      transition:all var(--tr);
+      /* bigger touch targets on mobile */
+      min-height:48px;
+    }
+    .form-input:focus,.form-select:focus {
+      outline:none; border-color:var(--pri);
+      background:var(--card); box-shadow:0 0 0 3px rgba(26,122,110,.1);
+    }
+    .select-wrap { position:relative; }
+    .select-wrap::after {
+      content:'▾'; position:absolute; right:12px; top:50%;
+      transform:translateY(-50%); color:var(--txt-lt);
+      pointer-events:none; font-size:13px;
+    }
+    .section-divider { height:1px; background:var(--border); margin:18px 0; }
+    .form-section-title {
+      font-size:10px; font-weight:800; text-transform:uppercase;
+      letter-spacing:.6px; color:var(--txt-lt); margin-bottom:12px;
+    }
+
+    /* Menu counters */
+    .menu-group {
+      background:var(--bg2); border-radius:var(--r);
+      padding:14px; display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .menu-item { display:flex; align-items:center; gap:8px; flex:1; min-width:100px; }
+    .menu-label { font-size:14px; font-weight:600; color:var(--txt-md); flex:1; }
+    .counter {
+      display:flex; align-items:center; gap:4px;
+      background:var(--card); border-radius:var(--r-pill);
+      padding:3px; border:1.5px solid var(--border);
+    }
+    .counter-btn {
+      width:34px; height:34px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size:20px; font-weight:700; color:var(--pri);
+      background:transparent; transition:background var(--tr);
+    }
+    .counter-btn:active { background:var(--bg2); }
+    .counter-val { min-width:28px; text-align:center; font-weight:700; font-size:16px; }
+
+    /* Toggle */
+    .toggle-wrap { display:flex; gap:6px; }
+    .toggle-opt {
+      flex:1; padding:13px; text-align:center;
+      border-radius:var(--r-sm); font-weight:700; font-size:14px;
+      border:2px solid var(--border); background:var(--bg2); color:var(--txt-md);
+      transition:all var(--tr); min-height:48px;
+    }
+    .toggle-opt.active-yes { background:#E8F8F2; border-color:var(--success); color:var(--success); }
+    .toggle-opt.active-no  { background:#FDEAEA; border-color:var(--danger);  color:var(--danger);  }
+
+    /* Price preview */
+    .price-preview {
+      background:linear-gradient(135deg,var(--pri) 0%,var(--pri-lt) 100%);
+      border-radius:var(--r); padding:18px 20px; color:#fff;
+      display:flex; align-items:center; justify-content:space-between;
+      gap:12px; flex-wrap:wrap; margin-top:18px;
+    }
+    .price-preview-label { font-size:12px; opacity:.85; font-weight:600; }
+    .price-preview-value { font-size:26px; font-weight:800; letter-spacing:-.5px; }
+    .price-preview-sub   { font-size:12px; opacity:.75; margin-top:2px; }
+
+    /* Submit button */
+    .btn-submit {
+      width:100%; padding:16px;
+      background:linear-gradient(135deg,var(--pri) 0%,var(--pri-lt) 100%);
+      color:#fff; border-radius:var(--r-pill);
+      font-size:16px; font-weight:800;
+      box-shadow:0 6px 20px rgba(26,122,110,.35);
+      transition:all var(--tr); margin-top:18px;
+      min-height:52px;
+    }
+    .btn-submit:active { transform:scale(.98); }
+    .btn-submit:disabled { opacity:.6; cursor:not-allowed; }
+
+    /* Add excursion inline */
+    .add-exc-row { display:flex; gap:8px; margin-top:8px; }
+    .add-exc-row input {
+      flex:1; padding:10px 12px;
+      border:1.5px solid var(--border); border-radius:var(--r-sm);
+      background:var(--bg2); font-size:14px;
+    }
+    .add-exc-row button {
+      padding:10px 14px; background:var(--pri); color:#fff;
+      border-radius:var(--r-sm); font-weight:700; font-size:14px;
+    }
+    .btn-link {
+      background:none; color:var(--txt-lt);
+      font-size:12px; text-align:left; margin-top:4px; padding:0;
+    }
+
+    /* ── Table Section ───────────────────────────────────────── */
+    .table-header {
+      display:flex; align-items:center;
+      justify-content:space-between;
+      margin-bottom:14px; flex-wrap:wrap; gap:10px;
+    }
+    .table-header h2 { font-size:19px; font-weight:800; }
+    .table-controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .search-input {
+      padding:10px 14px; border:1.5px solid var(--border);
+      border-radius:var(--r-pill); background:var(--card);
+      width:180px; font-size:14px; min-height:42px;
+    }
+    .search-input:focus { outline:none; border-color:var(--pri); }
+    .btn-sm {
+      padding:9px 14px; border-radius:var(--r-pill);
+      font-weight:600; font-size:12px;
+      border:1.5px solid var(--border);
+      background:var(--card); color:var(--txt-md);
+      transition:all var(--tr); display:flex;
+      align-items:center; gap:4px; white-space:nowrap;
+      min-height:40px;
+    }
+    .btn-sm:hover { background:var(--bg2); }
+    .btn-sm.active { background:var(--pri); color:#fff; border-color:var(--pri); }
+    .btn-sheets {
+      padding:9px 14px; border-radius:var(--r-pill);
+      font-weight:700; font-size:12px;
+      background:#0F9D58; color:#fff;
+      border:none; display:flex; align-items:center; gap:5px;
+      white-space:nowrap; min-height:40px; transition:all var(--tr);
+    }
+    .btn-sheets:hover { background:#0B7A45; }
+
+    /* Stats bar */
+    .stats-bar {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+      gap:10px; margin-bottom:16px;
+    }
+    .stat-card {
+      background:var(--card); border-radius:var(--r);
+      padding:12px 14px; box-shadow:var(--shadow);
+    }
+    .stat-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--txt-lt); }
+    .stat-value { font-size:20px; font-weight:800; margin-top:2px; }
+    .stat-value.green  { color:var(--success); }
+    .stat-value.blue   { color:var(--pri); }
+    .stat-value.orange { color:var(--acc-dk); }
+
+    /* Filter bar */
+    .filter-bar { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+    .filter-select {
+      padding:8px 12px; border:1.5px solid var(--border);
+      border-radius:var(--r-pill); background:var(--card);
+      font-size:13px; color:var(--txt); min-height:38px;
+    }
+    .filter-select:focus { outline:none; border-color:var(--pri); }
+
+    /* Table */
+    .table-wrap { background:var(--card); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
+    .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    thead tr { background:var(--bg2); border-bottom:2px solid var(--border); }
+    th {
+      padding:11px 12px; text-align:left;
+      font-size:10px; font-weight:800;
+      text-transform:uppercase; letter-spacing:.5px;
+      color:var(--txt-md); white-space:nowrap;
+    }
+    td { padding:11px 12px; border-bottom:1px solid var(--border); vertical-align:middle; white-space:nowrap; }
+    tbody tr:last-child td { border-bottom:none; }
+
+    /* Row states */
+    tr.row-cancelled td { background:#FFF0F0 !important; }
+    tr.row-unpaid td    { background:#FFF8EE !important; }
+    tr.row-cancelled:hover td { background:#FFE4E4 !important; }
+    tr.row-unpaid:hover td    { background:#FFF0DC !important; }
+
+    .badge {
+      display:inline-flex; align-items:center;
+      padding:3px 9px; border-radius:var(--r-pill);
+      font-size:11px; font-weight:700;
+    }
+    .badge-yes     { background:#E8F8F2; color:var(--success); }
+    .badge-no      { background:#FDEAEA; color:var(--danger); }
+    .badge-exc     { background:#EEF3FF; color:#4B6DDD; }
+    .badge-seller  { background:#FFF4E8; color:#B55E0A; }
+    .badge-cancel  { background:#FDEAEA; color:var(--danger); font-size:11px; }
+
+    .btn-table {
+      padding:5px 9px; border-radius:8px;
+      font-size:11px; font-weight:600; margin:0 2px;
+      transition:all var(--tr); white-space:nowrap;
+    }
+    .btn-edit    { background:#EEF3FF; color:#4B6DDD; }
+    .btn-edit:hover { background:#4B6DDD; color:#fff; }
+    .btn-del     { background:#FDEAEA; color:var(--danger); }
+    .btn-del:hover  { background:var(--danger); color:#fff; }
+    .btn-cancel  { background:#FFF0F0; color:#C0392B; }
+    .btn-cancel:hover  { background:#C0392B; color:#fff; }
+    .btn-activate{ background:#E8F8F2; color:var(--success); }
+    .btn-activate:hover { background:var(--success); color:#fff; }
+
+    th.sortable { cursor:pointer; user-select:none; }
+    th.sortable:hover { color:var(--pri); }
+    th.sortable::after { content:' ↕'; opacity:.35; }
+    th.sort-asc::after  { content:' ↑'; opacity:1; color:var(--pri); }
+    th.sort-desc::after { content:' ↓'; opacity:1; color:var(--pri); }
+
+    .empty-state { text-align:center; padding:50px 20px; color:var(--txt-lt); }
+    .empty-icon  { font-size:44px; margin-bottom:12px; }
+
+    /* ── Modal ───────────────────────────────────────────────── */
+    .modal-overlay {
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,.5); z-index:999;
+      align-items:flex-end; justify-content:center;
+      padding:0; backdrop-filter:blur(3px);
+    }
+    .modal-overlay.open { display:flex; animation:fadeIn .2s ease; }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+    .modal-box {
+      background:var(--card);
+      border-radius:24px 24px 0 0;
+      box-shadow:var(--shadow-lg);
+      width:100%; max-width:100%;
+      max-height:92vh; overflow-y:auto;
+      padding:24px 16px 40px;
+      position:relative;
+      animation:slideUp .28s cubic-bezier(.32,1,.32,1);
+    }
+    @keyframes slideUp { from{transform:translateY(60px)} to{transform:none} }
+    /* Desktop: center it */
+    @media(min-width:640px) {
+      .modal-overlay { align-items:center; padding:20px; }
+      .modal-box { border-radius:24px; max-width:740px; max-height:90vh; padding:32px; }
+      .modal-box.wide { max-width:960px; }
+    }
+    .modal-handle {
+      width:40px; height:4px; background:var(--border);
+      border-radius:2px; margin:0 auto 20px;
+    }
+    @media(min-width:640px) { .modal-handle { display:none; } }
+    .modal-close {
+      position:absolute; top:16px; right:16px;
+      width:34px; height:34px; border-radius:50%;
+      background:var(--bg2); color:var(--txt-md);
+      font-size:16px; display:flex; align-items:center;
+      justify-content:center; transition:background var(--tr);
+    }
+    .modal-close:hover { background:var(--border); }
+    .modal-title { font-size:18px; font-weight:800; margin-bottom:20px; display:flex; align-items:center; gap:8px; }
+
+    /* Settings modal tabs */
+    .modal-tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid var(--border); padding-bottom:0; }
+    .modal-tab {
+      padding:9px 16px; border-radius:var(--r-pill) var(--r-pill) 0 0;
+      font-weight:600; font-size:13px; color:var(--txt-md);
+      background:transparent; transition:all var(--tr); margin-bottom:-2px;
+      border-bottom:2px solid transparent;
+    }
+    .modal-tab.active { color:var(--pri); border-bottom-color:var(--pri); font-weight:800; }
+    .modal-tab-content { display:none; }
+    .modal-tab-content.active { display:block; }
+
+    /* Price table */
+    .price-table { width:100%; border-collapse:collapse; }
+    .price-table th {
+      padding:9px 12px; background:var(--bg2);
+      font-size:10px; font-weight:800;
+      text-transform:uppercase; letter-spacing:.5px;
+      color:var(--txt-md); border-bottom:2px solid var(--border);
+    }
+    .price-table td { padding:10px 12px; border-bottom:1px solid var(--border); }
+    .price-table tr:last-child td { border-bottom:none; }
+    .price-input {
+      padding:8px 10px; border:1.5px solid var(--border);
+      border-radius:var(--r-sm); background:var(--bg2);
+      width:100px; font-size:14px; font-weight:600; color:var(--txt);
+      transition:all var(--tr);
+    }
+    .price-input:focus { outline:none; border-color:var(--pri); background:#fff; }
+    .exc-name-cell { font-weight:700; font-size:13px; }
+    .btn-del-row {
+      padding:5px 9px; border-radius:var(--r-sm);
+      background:#FDEAEA; color:var(--danger);
+      font-size:12px; font-weight:700;
+    }
+    .btn-del-row:hover { background:var(--danger); color:#fff; }
+
+    /* Sellers list */
+    .sellers-list { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+    .seller-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 14px; background:var(--bg2); border-radius:var(--r);
+      font-weight:600; font-size:14px;
+    }
+
+    .add-row {
+      display:flex; gap:8px; margin-top:14px;
+      padding-top:14px; border-top:1px solid var(--border);
+    }
+    .add-row input {
+      flex:1; padding:10px 14px;
+      border:1.5px solid var(--border); border-radius:var(--r);
+      background:var(--bg2); font-size:14px;
+    }
+    .add-row input:focus { outline:none; border-color:var(--pri); }
+    .btn-add {
+      padding:10px 18px; background:var(--pri); color:#fff;
+      border-radius:var(--r-pill); font-weight:700; font-size:14px;
+      transition:all var(--tr);
+    }
+    .btn-add:hover { background:var(--pri-dk); }
+    .btn-save-all {
+      width:100%; margin-top:20px; padding:14px;
+      background:linear-gradient(135deg,var(--pri),var(--pri-lt));
+      color:#fff; border-radius:var(--r-pill);
+      font-size:15px; font-weight:800;
+      box-shadow:0 6px 20px rgba(26,122,110,.3);
+      transition:all var(--tr);
+    }
+    .btn-save-all:hover { transform:translateY(-1px); }
+
+    /* ── Toast ───────────────────────────────────────────────── */
+    #toast {
+      position:fixed; bottom:24px; left:50%;
+      transform:translateX(-50%) translateY(80px);
+      background:var(--txt); color:#fff;
+      padding:12px 22px; border-radius:var(--r-pill);
+      font-weight:600; font-size:14px; z-index:9999;
+      opacity:0; transition:all .3s cubic-bezier(.34,1.56,.64,1);
+      box-shadow:0 8px 32px rgba(0,0,0,.25); white-space:nowrap;
+    }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    #toast.success { background:var(--success); }
+    #toast.error   { background:var(--danger); }
+
+    /* ── Confirm Dialog ──────────────────────────────────────── */
+    #confirmDialog {
+      position:fixed; inset:0; background:rgba(0,0,0,.5);
+      z-index:9998; display:none; align-items:center;
+      justify-content:center; backdrop-filter:blur(3px);
+    }
+    #confirmDialog.open { display:flex; }
+    .confirm-box {
+      background:var(--card); border-radius:20px;
+      padding:28px 24px; max-width:360px; width:90%;
+      text-align:center; box-shadow:var(--shadow-lg);
+    }
+    .confirm-box h3 { font-size:17px; margin-bottom:8px; }
+    .confirm-box p  { color:var(--txt-md); font-size:14px; margin-bottom:22px; }
+    .confirm-actions { display:flex; gap:10px; }
+    .btn-confirm-yes {
+      flex:1; padding:13px; background:var(--danger);
+      color:#fff; border-radius:var(--r-pill); font-weight:700; font-size:14px;
+    }
+    .btn-confirm-no {
+      flex:1; padding:13px; background:var(--bg2);
+      color:var(--txt-md); border-radius:var(--r-pill); font-weight:700; font-size:14px;
+    }
+
+    /* ── Spinner ─────────────────────────────────────────────── */
+    .spinner {
+      display:inline-block; width:16px; height:16px;
+      border:2.5px solid rgba(255,255,255,.4);
+      border-top-color:#fff; border-radius:50%;
+      animation:spin .7s linear infinite;
+      vertical-align:middle; margin-right:6px;
+    }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* ── Mobile overrides ────────────────────────────────────── */
+    @media(max-width:600px) {
+      .form-grid { grid-template-columns:1fr; }
+      .form-group.full { grid-column:1; }
+      .stats-bar { grid-template-columns:1fr 1fr; }
+      .search-input { width:100%; }
+      .table-controls { width:100%; }
+      .filter-bar { gap:6px; }
+      .filter-select { font-size:12px; padding:7px 10px; }
+      .btn-sm, .btn-sheets { font-size:12px; padding:8px 11px; }
+      main { padding:12px 10px 90px; }
+      .form-card { padding:16px 12px; }
+      .logo-text { display:none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <span>⛵</span>
+      <span class="logo-text">Rezervacije</span>
+    </div>
+    <nav class="nav-tabs">
+      <button class="nav-tab active" onclick="showTab('booking')">+ Nova</button>
+      <button class="nav-tab" onclick="showTab('table')">Pregled</button>
+    </nav>
+    <div class="header-right">
+      <div class="live-dot" id="liveDot"></div>
+      <span class="live-text" id="liveText">…</span>
+      <button class="btn-settings" onclick="openSettings()">⚙️</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ══════════════════════════════════════════════════
+       FORMA ZA NOVU REZERVACIJU
+  ══════════════════════════════════════════════════ -->
+  <div id="tab-booking" class="tab-content active">
+    <div class="form-card">
+      <h2>📋 Nova Rezervacija</h2>
+      <form id="bookingForm" onsubmit="submitBooking(event)">
+
+        <p class="form-section-title">Osobni podaci</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Ime i prezime</label>
+            <input class="form-input" type="text" id="f-name" placeholder="Ana Horvat" required />
+          </div>
+          <div class="form-group">
+            <label>Broj mobitela</label>
+            <input class="form-input" type="tel" id="f-phone" placeholder="+385 91 234 5678" />
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+        <p class="form-section-title">Detalji izleta</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Izlet</label>
+            <div class="select-wrap">
+              <select class="form-select" id="f-excursion" onchange="updatePricePreview()" required>
+                <option value="">— Odaberi izlet —</option>
+              </select>
+            </div>
+            <div class="add-exc-row" id="addExcRow" style="display:none">
+              <input type="text" id="newExcName" placeholder="Naziv novog izleta" />
+              <button type="button" onclick="quickAddExcursion()">+ Dodaj</button>
+            </div>
+            <button type="button" class="btn-link" onclick="toggleAddExcRow()">+ Dodaj novi izlet</button>
+          </div>
+
+          <div class="form-group">
+            <label>Polazak</label>
+            <input class="form-input" type="text" id="f-departure" placeholder="Split - 09:00" />
+          </div>
+
+          <div class="form-group">
+            <label>Datum</label>
+            <input class="form-input" type="date" id="f-date" required />
+          </div>
+
+          <div class="form-group">
+            <label>Prodavač</label>
+            <div class="select-wrap">
+              <select class="form-select" id="f-seller" required>
+                <option value="">— Odaberi —</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+        <p class="form-section-title">Broj osoba</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Broj odraslih</label>
+            <input class="form-input" type="number" id="f-adults" min="0" value="0" oninput="updatePricePreview()" />
+          </div>
+          <div class="form-group">
+            <label>Broj djece</label>
+            <input class="form-input" type="number" id="f-children" min="0" value="0" oninput="updatePricePreview()" />
+          </div>
+          <div class="form-group">
+            <label>Broj gratisa</label>
+            <input class="form-input" type="number" id="f-free" min="0" value="0" />
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+        <p class="form-section-title">Izbor menija</p>
+        <div class="menu-group">
+          <div class="menu-item">
+            <span class="menu-label">🐟 Riba</span>
+            <div class="counter">
+              <button type="button" class="counter-btn" onclick="adjustCounter('f-riba',-1)">−</button>
+              <span class="counter-val" id="f-riba-disp">0</span>
+              <input type="hidden" id="f-riba" value="0" />
+              <button type="button" class="counter-btn" onclick="adjustCounter('f-riba',1)">+</button>
+            </div>
+          </div>
+          <div class="menu-item">
+            <span class="menu-label">🥩 Meso</span>
+            <div class="counter">
+              <button type="button" class="counter-btn" onclick="adjustCounter('f-meso',-1)">−</button>
+              <span class="counter-val" id="f-meso-disp">0</span>
+              <input type="hidden" id="f-meso" value="0" />
+              <button type="button" class="counter-btn" onclick="adjustCounter('f-meso',1)">+</button>
+            </div>
+          </div>
+          <div class="menu-item">
+            <span class="menu-label">🥗 Vege</span>
+            <div class="counter">
+              <button type="button" class="counter-btn" onclick="adjustCounter('f-vege',-1)">−</button>
+              <span class="counter-val" id="f-vege-disp">0</span>
+              <input type="hidden" id="f-vege" value="0" />
+              <button type="button" class="counter-btn" onclick="adjustCounter('f-vege',1)">+</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+        <p class="form-section-title">Plaćanje</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Uplaćeni polog (€)</label>
+            <input class="form-input" type="number" id="f-deposit" min="0" step="0.01" value="0" />
+          </div>
+          <div class="form-group">
+            <label>Plaćeno</label>
+            <div class="toggle-wrap">
+              <button type="button" class="toggle-opt" id="paid-yes" onclick="setToggle('paid','DA')">DA</button>
+              <button type="button" class="toggle-opt active-no" id="paid-no" onclick="setToggle('paid','NE')">NE</button>
+            </div>
+            <input type="hidden" id="f-paid" value="NE" />
+          </div>
+          <div class="form-group">
+            <label>Popust</label>
+            <div class="toggle-wrap">
+              <button type="button" class="toggle-opt" id="disc-yes" onclick="setToggle('disc','DA')">DA</button>
+              <button type="button" class="toggle-opt active-no" id="disc-no" onclick="setToggle('disc','NE')">NE</button>
+            </div>
+            <input type="hidden" id="f-discount" value="NE" />
+          </div>
+        </div>
+
+        <div id="pricePreview" class="price-preview" style="display:none">
+          <div>
+            <div class="price-preview-label">Ukupna cijena</div>
+            <div class="price-preview-value" id="previewTotal">0,00 €</div>
+            <div class="price-preview-sub"   id="previewBreakdown">—</div>
+          </div>
+          <div style="text-align:right">
+            <div class="price-preview-label">Provizija</div>
+            <div class="price-preview-value" id="previewComm" style="font-size:20px">0,00 €</div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="submitBtn">Spremi rezervaciju →</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       TABLICA REZERVACIJA
+  ══════════════════════════════════════════════════ -->
+  <div id="tab-table" class="tab-content">
+
+    <div class="table-header">
+      <h2>📊 Rezervacije</h2>
+      <div class="table-controls">
+        <input class="search-input" type="text" placeholder="🔍 Pretraži..." oninput="renderTable()" id="searchInput" />
+        <button class="btn-sm" id="toggleDateBtn" onclick="toggleDateColumn()">📅 Datum bukinga</button>
+        <button class="btn-sheets" onclick="exportToSheets()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+          Google Sheets
+        </button>
+      </div>
+    </div>
+
+    <!-- Legende boja -->
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--txt-lt);display:flex;align-items:center;gap:5px">
+        <span style="width:14px;height:14px;background:#FFF0F0;border-radius:3px;border:1px solid #FDBCBC;display:inline-block"></span>Otkazano
+      </span>
+      <span style="font-size:12px;color:var(--txt-lt);display:flex;align-items:center;gap:5px">
+        <span style="width:14px;height:14px;background:#FFF8EE;border-radius:3px;border:1px solid #FAD7A0;display:inline-block"></span>Nije plaćeno
+      </span>
+    </div>
+
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-card"><div class="stat-label">Rezervacija</div><div class="stat-value blue" id="statTotal">0</div></div>
+      <div class="stat-card"><div class="stat-label">Odrasli</div><div class="stat-value" id="statAdults">0</div></div>
+      <div class="stat-card"><div class="stat-label">Djeca</div><div class="stat-value" id="statChildren">0</div></div>
+      <div class="stat-card"><div class="stat-label">Prihod</div><div class="stat-value green" id="statRevenue">0 €</div></div>
+      <div class="stat-card"><div class="stat-label">Provizija</div><div class="stat-value orange" id="statComm">0 €</div></div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="select-wrap" style="width:150px">
+        <select class="filter-select" id="filterExc" onchange="renderTable()" style="width:100%">
+          <option value="">Svi izleti</option>
+        </select>
+      </div>
+      <div class="select-wrap" style="width:140px">
+        <select class="filter-select" id="filterSeller" onchange="renderTable()" style="width:100%">
+          <option value="">Svi prodavači</option>
+        </select>
+      </div>
+      <div class="select-wrap" style="width:130px">
+        <select class="filter-select" id="filterPaid" onchange="renderTable()" style="width:100%">
+          <option value="">Plaćeno: sve</option>
+          <option value="DA">Plaćeno: DA</option>
+          <option value="NE">Plaćeno: NE</option>
+        </select>
+      </div>
+      <div class="select-wrap" style="width:130px">
+        <select class="filter-select" id="filterMonth" onchange="renderTable()" style="width:100%">
+          <option value="">Svi mjeseci</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table id="bookingTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th class="sortable" onclick="sortTable('name')">Ime i prezime</th>
+              <th>Mobitel</th>
+              <th class="sortable" onclick="sortTable('excursion')">Izlet</th>
+              <th>Polazak</th>
+              <th class="sortable" onclick="sortTable('date')">Datum</th>
+              <th>Mj.</th>
+              <th>Tjedan</th>
+              <th>Odrasli</th>
+              <th>Djeca</th>
+              <th>Gratis</th>
+              <th>Riba</th>
+              <th>Meso</th>
+              <th>Vege</th>
+              <th>Polog (€)</th>
+              <th>Plaćeno</th>
+              <th>Prodavač</th>
+              <th>Popust</th>
+              <th class="sortable" onclick="sortTable('totalPrice')">Ukupno (€)</th>
+              <th class="sortable" onclick="sortTable('commission')">Provizija (€)</th>
+              <th id="colDateBuking">Datum bukinga</th>
+              <th>Akcije</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="emptyState" style="display:none">
+        <div class="empty-icon">🏖️</div>
+        <p>Nema rezervacija za prikaz.</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ══════════════════════════════════════════════════
+     SETTINGS MODAL (Cijene | Izleti | Prodavači)
+══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-box wide">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeSettings()">✕</button>
+    <div class="modal-title">⚙️ Postavke</div>
+
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="switchTab('tabCijene')">💰 Cijene</button>
+      <button class="modal-tab" onclick="switchTab('tabIzleti')">🗺️ Izleti</button>
+      <button class="modal-tab" onclick="switchTab('tabProdavaci')">👥 Prodavači</button>
+    </div>
+
+    <!-- TAB: Cijene -->
+    <div id="tabCijene" class="modal-tab-content active">
+      <div style="overflow-x:auto">
+        <table class="price-table" id="priceTable">
+          <thead>
+            <tr>
+              <th>Izlet</th>
+              <th>Cijena odrasli (€)</th>
+              <th>Cijena djeca (€)</th>
+            </tr>
+          </thead>
+          <tbody id="priceTableBody"></tbody>
+        </table>
+      </div>
+      <button class="btn-save-all" onclick="savePrices()">Spremi cijene</button>
+    </div>
+
+    <!-- TAB: Izleti -->
+    <div id="tabIzleti" class="modal-tab-content">
+      <div id="excursionsList" class="sellers-list"></div>
+      <div class="add-row">
+        <input type="text" id="newExcModal" placeholder="Naziv novog izleta" />
+        <input type="number" id="newExcAdult" placeholder="€ odrasli" min="0" step="0.01" style="width:110px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--bg2);font-size:14px" />
+        <input type="number" id="newExcChild" placeholder="€ djeca" min="0" step="0.01" style="width:110px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--bg2);font-size:14px" />
+        <button class="btn-add" onclick="addExcursion()">+ Dodaj</button>
+      </div>
+    </div>
+
+    <!-- TAB: Prodavači -->
+    <div id="tabProdavaci" class="modal-tab-content">
+      <div id="sellersList" class="sellers-list"></div>
+      <div class="add-row">
+        <input type="text" id="newSellerName" placeholder="Ime prodavača" />
+        <button class="btn-add" onclick="addSeller()">+ Dodaj</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     EDIT MODAL
+══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeEditModal()">✕</button>
+    <div class="modal-title">✏️ Uredi rezervaciju</div>
+    <form id="editForm" onsubmit="saveEdit(event)">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Ime i prezime</label>
+          <input class="form-input" type="text" id="e-name" required />
+        </div>
+        <div class="form-group">
+          <label>Broj mobitela</label>
+          <input class="form-input" type="tel" id="e-phone" />
+        </div>
+        <div class="form-group">
+          <label>Izlet</label>
+          <div class="select-wrap">
+            <select class="form-select" id="e-excursion" required></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Polazak</label>
+          <input class="form-input" type="text" id="e-departure" />
+        </div>
+        <div class="form-group">
+          <label>Datum</label>
+          <input class="form-input" type="date" id="e-date" required />
+        </div>
+        <div class="form-group">
+          <label>Prodavač</label>
+          <div class="select-wrap">
+            <select class="form-select" id="e-seller"></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Broj odraslih</label>
+          <input class="form-input" type="number" id="e-adults" min="0" />
+        </div>
+        <div class="form-group">
+          <label>Broj djece</label>
+          <input class="form-input" type="number" id="e-children" min="0" />
+        </div>
+        <div class="form-group">
+          <label>Broj gratisa</label>
+          <input class="form-input" type="number" id="e-free" min="0" />
+        </div>
+        <div class="form-group">
+          <label>Uplaćeni polog (€)</label>
+          <input class="form-input" type="number" id="e-deposit" min="0" step="0.01" />
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <p class="form-section-title">Izbor menija</p>
+        <div class="menu-group">
+          <div class="menu-item">
+            <span class="menu-label">🐟 Riba</span>
+            <div class="counter">
+              <button type="button" class="counter-btn" onclick="adjustCounter('e-riba',-1)">−</button>
+              <span class="counter-val" id="e-riba-disp">0</span>
+              <input type="hidden" id="e-riba" value="0" />
+              <button type="button" class="counter-btn" onclick="adjustCounter('e-riba',1)">+</button>
+            </div>
+          </div>
+          <div class="menu-item">
+            <span class="menu-label">🥩 Meso</span>
+            <div class="counter">
+              <button type="button" class="counter-btn" onclick="adjustCounter('e-meso',-1)">−</button>
+              <span class="counter-val" id="e-meso-disp">0</span>
+              <input type="hidden" id="e-meso" value="0" />
+              <button type="button" class="counter-btn" onclick="adjustCounter('e-meso',1)">+</button>
+            </div>
+          </div>
+          <div class="menu-item">
+            <span class="menu-label">🥗 Vege</span>
+            <div class="counter">
+              <button type="button" class="counter-btn" onclick="adjustCounter('e-vege',-1)">−</button>
+              <span class="counter-val" id="e-vege-disp">0</span>
+              <input type="hidden" id="e-vege" value="0" />
+              <button type="button" class="counter-btn" onclick="adjustCounter('e-vege',1)">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-grid" style="margin-top:14px">
+        <div class="form-group">
+          <label>Plaćeno</label>
+          <div class="toggle-wrap">
+            <button type="button" class="toggle-opt" id="e-paid-yes" onclick="setToggleEdit('paid','DA')">DA</button>
+            <button type="button" class="toggle-opt active-no" id="e-paid-no" onclick="setToggleEdit('paid','NE')">NE</button>
+          </div>
+          <input type="hidden" id="e-paid" value="NE" />
+        </div>
+        <div class="form-group">
+          <label>Popust</label>
+          <div class="toggle-wrap">
+            <button type="button" class="toggle-opt" id="e-disc-yes" onclick="setToggleEdit('disc','DA')">DA</button>
+            <button type="button" class="toggle-opt active-no" id="e-disc-no" onclick="setToggleEdit('disc','NE')">NE</button>
+          </div>
+          <input type="hidden" id="e-discount" value="NE" />
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit">Spremi izmjene</button>
+    </form>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div id="confirmDialog">
+  <div class="confirm-box">
+    <h3>Izbriši rezervaciju</h3>
+    <p>Ova radnja se ne može poništiti.</p>
+    <div class="confirm-actions">
+      <button class="btn-confirm-no" onclick="closeConfirm()">Odustani</button>
+      <button class="btn-confirm-yes" onclick="confirmDeleteAction()">Izbriši</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════ -->
+<script>
+/* ── Firebase config ─────────────────────────────────────── */
+const firebaseConfig = {
+  apiKey:            "AIzaSyC_A_gVi1Z-yztqOa8XZS2DFT4wMjg413w",
+  authDomain:        "rezervacije-9ad8c.firebaseapp.com",
+  databaseURL:       "https://rezervacije-9ad8c-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "rezervacije-9ad8c",
+  storageBucket:     "rezervacije-9ad8c.firebasestorage.app",
+  messagingSenderId: "546125330052",
+  appId:             "1:546125330052:web:e0efe4b1e1a9b5588234d1",
+  measurementId:     "G-Z85FSCEP5W"
+};
+
+/* ── State ───────────────────────────────────────────────── */
+let db         = null;
+let bookings   = [];
+let prices     = {};
+let excursions = ['Hvar i Brač','Delux','Rafting','Omiš i Cetina','Toni','Sunset Povlja','Sunset Supetar','Dinner Supetar'];
+let sellers    = ['Slavica','Nela','Mirko'];
+let showDateColumn = true;
+let sortKey = 'date';
+let sortDir = 'desc';
+let editingId = null;
+let deleteId  = null;
+
+/* ── Init ────────────────────────────────────────────────── */
+function init() {
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+
+    db.ref('.info/connected').on('value', s => setLive(s.val() === true));
+
+    db.ref('config').on('value', snap => {
+      const d = snap.val() || {};
+      if (d.prices)     prices     = d.prices;
+      if (d.excursions) excursions = d.excursions;
+      if (d.sellers)    sellers    = d.sellers;
+      else db.ref('config/sellers').set(sellers);
+      renderSelects();
+      renderPriceTable();
+      updatePricePreview();
+    });
+
+    db.ref('bookings').on('value', snap => {
+      const d = snap.val() || {};
+      bookings = Object.entries(d)
+        .map(([id, b]) => ({ id, ...b }))
+        .sort((a, b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+      renderTable();
+    }, () => toast('Greška pri dohvatu podataka','error'));
+
+  } catch(e) {
+    console.error(e);
+    setLive(false);
+    renderSelects();
+  }
+}
+
+function setLive(on) {
+  document.getElementById('liveDot').classList.toggle('online', on);
+  document.getElementById('liveText').textContent = on ? 'Uživo' : 'Offline';
+}
+
+/* ── Dropdowns ───────────────────────────────────────────── */
+function renderSelects() {
+  // Excursion selects
+  ['f-excursion','e-excursion'].forEach(id => {
+    const el = document.getElementById(id); if(!el) return;
+    const cur = el.value;
+    el.innerHTML = `<option value="">— Odaberi izlet —</option>` +
+      excursions.map(e => `<option value="${esc(e)}"${e===cur?' selected':''}>${esc(e)}</option>`).join('');
+  });
+  // Seller selects
+  ['f-seller','e-seller'].forEach(id => {
+    const el = document.getElementById(id); if(!el) return;
+    const cur = el.value;
+    el.innerHTML = `<option value="">— Odaberi —</option>` +
+      sellers.map(s => `<option value="${esc(s)}"${s===cur?' selected':''}>${esc(s)}</option>`).join('');
+  });
+  // Filter dropdowns
+  const fe = document.getElementById('filterExc');
+  if (fe) {
+    const cur = fe.value;
+    fe.innerHTML = `<option value="">Svi izleti</option>` +
+      excursions.map(e => `<option value="${esc(e)}"${e===cur?' selected':''}>${esc(e)}</option>`).join('');
+  }
+  const fs = document.getElementById('filterSeller');
+  if (fs) {
+    const cur = fs.value;
+    fs.innerHTML = `<option value="">Svi prodavači</option>` +
+      sellers.map(s => `<option value="${esc(s)}"${s===cur?' selected':''}>${esc(s)}</option>`).join('');
+  }
+}
+
+/* ── Settings Modal ──────────────────────────────────────── */
+function openSettings() {
+  renderPriceTable();
+  renderExcursionsList();
+  renderSellersList();
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+function switchTab(id) {
+  document.querySelectorAll('.modal-tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.modal-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+/* ── Price Table ─────────────────────────────────────────── */
+function renderPriceTable() {
+  const tbody = document.getElementById('priceTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = excursions.map(exc => {
+    const p = prices[exc] || { adult:0, child:0 };
+    return `<tr>
+      <td class="exc-name-cell">${esc(exc)}</td>
+      <td><input class="price-input" type="number" min="0" step="0.01" id="pa-${safeId(exc)}" value="${p.adult||0}" /></td>
+      <td><input class="price-input" type="number" min="0" step="0.01" id="pc-${safeId(exc)}" value="${p.child||0}" /></td>
+    </tr>`;
+  }).join('');
+}
+
+function savePrices() {
+  excursions.forEach(exc => {
+    const a = parseFloat(document.getElementById(`pa-${safeId(exc)}`)?.value)||0;
+    const c = parseFloat(document.getElementById(`pc-${safeId(exc)}`)?.value)||0;
+    prices[exc] = { adult:a, child:c };
+  });
+  db.ref('config/prices').set(prices)
+    .then(()=>toast('Cijene su spremljene! ✓','success'))
+    .catch(()=>toast('Greška pri spremanju','error'));
+  updatePricePreview();
+}
+
+/* ── Excursions ──────────────────────────────────────────── */
+function renderExcursionsList() {
+  document.getElementById('excursionsList').innerHTML = excursions.map(e => `
+    <div class="seller-row">
+      <span>${esc(e)}</span>
+      <button class="btn-del-row" onclick="removeExcursion('${esc(e)}')">✕ Ukloni</button>
+    </div>`).join('');
+}
+
+function addExcursion() {
+  const nameEl  = document.getElementById('newExcModal');
+  const adultEl = document.getElementById('newExcAdult');
+  const childEl = document.getElementById('newExcChild');
+  const name = nameEl.value.trim();
+  if (!name) { toast('Unesite naziv izleta','error'); return; }
+  if (excursions.includes(name)) { toast('Izlet već postoji','error'); return; }
+  excursions.push(name);
+  prices[name] = { adult: parseFloat(adultEl.value)||0, child: parseFloat(childEl.value)||0 };
+  nameEl.value=''; adultEl.value=''; childEl.value='';
+  saveConfig();
+  renderExcursionsList();
+  renderPriceTable();
+  renderSelects();
+}
+
+function removeExcursion(exc) {
+  if (!confirm(`Izbrisati izlet "${exc}"?`)) return;
+  excursions = excursions.filter(e=>e!==exc);
+  delete prices[exc];
+  saveConfig();
+  renderExcursionsList();
+  renderPriceTable();
+  renderSelects();
+}
+
+function quickAddExcursion() {
+  const el = document.getElementById('newExcName');
+  const name = el.value.trim();
+  if (!name) return;
+  if (!excursions.includes(name)) {
+    excursions.push(name);
+    prices[name] = { adult:0, child:0 };
+    saveConfig();
+    renderSelects();
+  }
+  document.getElementById('f-excursion').value = name;
+  el.value='';
+  document.getElementById('addExcRow').style.display='none';
+  updatePricePreview();
+}
+
+function toggleAddExcRow() {
+  const r = document.getElementById('addExcRow');
+  r.style.display = r.style.display==='none' ? 'flex' : 'none';
+}
+
+/* ── Sellers ─────────────────────────────────────────────── */
+function renderSellersList() {
+  document.getElementById('sellersList').innerHTML = sellers.map(s => `
+    <div class="seller-row">
+      <span>👤 ${esc(s)}</span>
+      <button class="btn-del-row" onclick="removeSeller('${esc(s)}')">✕ Ukloni</button>
+    </div>`).join('');
+}
+
+function addSeller() {
+  const el = document.getElementById('newSellerName');
+  const name = el.value.trim();
+  if (!name) { toast('Unesite ime prodavača','error'); return; }
+  if (sellers.includes(name)) { toast('Prodavač već postoji','error'); return; }
+  sellers.push(name);
+  el.value='';
+  saveConfig();
+  renderSellersList();
+  renderSelects();
+  toast(`Prodavač "${name}" dodan ✓`,'success');
+}
+
+function removeSeller(name) {
+  if (!confirm(`Ukloniti prodavača "${name}"?`)) return;
+  sellers = sellers.filter(s=>s!==name);
+  saveConfig();
+  renderSellersList();
+  renderSelects();
+}
+
+function saveConfig() {
+  db.ref('config').set({ prices, excursions, sellers }).catch(()=>{});
+}
+
+/* ── Counters ────────────────────────────────────────────── */
+function adjustCounter(id, delta) {
+  const inp  = document.getElementById(id);
+  const disp = document.getElementById(id+'-disp');
+  const val  = Math.max(0, (parseInt(inp.value)||0)+delta);
+  inp.value  = val;
+  disp.textContent = val;
+  if (id.startsWith('f-')) updatePricePreview();
+}
+
+/* ── Toggles ─────────────────────────────────────────────── */
+function setToggle(name, val) {
+  const p = name==='paid' ? 'paid' : 'disc';
+  const f = name==='paid' ? 'f-paid' : 'f-discount';
+  document.getElementById(f).value = val;
+  document.getElementById(`${p}-yes`).className = 'toggle-opt'+(val==='DA'?' active-yes':'');
+  document.getElementById(`${p}-no`).className  = 'toggle-opt'+(val==='NE'?' active-no':'');
+  updatePricePreview();
+}
+
+function setToggleEdit(name, val) {
+  const p = name==='paid' ? 'e-paid' : 'e-disc';
+  const f = name==='paid' ? 'e-paid' : 'e-discount';
+  document.getElementById(f).value = val;
+  document.getElementById(`${p}-yes`).className = 'toggle-opt'+(val==='DA'?' active-yes':'');
+  document.getElementById(`${p}-no`).className  = 'toggle-opt'+(val==='NE'?' active-no':'');
+}
+
+/* ── Price Preview ───────────────────────────────────────── */
+function updatePricePreview() {
+  const exc      = document.getElementById('f-excursion')?.value;
+  const adults   = parseInt(document.getElementById('f-adults')?.value)||0;
+  const children = parseInt(document.getElementById('f-children')?.value)||0;
+  const discount = document.getElementById('f-discount')?.value==='DA';
+  if (!exc) { document.getElementById('pricePreview').style.display='none'; return; }
+  const p        = prices[exc]||{adult:0,child:0};
+  const total    = adults*p.adult + children*p.child;
+  const comm     = total*(discount?.15:.25);
+  document.getElementById('pricePreview').style.display='flex';
+  document.getElementById('previewTotal').textContent = fmtEur(total);
+  document.getElementById('previewComm').textContent  = fmtEur(comm);
+  document.getElementById('previewBreakdown').textContent =
+    `${adults} odraslih × ${fmtEur(p.adult)} + ${children} djece × ${fmtEur(p.child)} | Provizija: ${discount?'15%':'25%'}`;
+}
+
+/* ── Calculations ────────────────────────────────────────── */
+function calcTotal(exc,adults,children) {
+  const p = prices[exc]||{adult:0,child:0};
+  return adults*p.adult + children*p.child;
+}
+function calcComm(total,discount) { return total*(discount==='DA'?.15:.25); }
+
+function getMjesec(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr+'T12:00:00').toLocaleString('hr-HR',{month:'long'});
+}
+function getTjedan(dateStr) {
+  if (!dateStr) return '';
+  const d   = new Date(dateStr+'T12:00:00');
+  const dof = d.getDay();
+  const back= (dof+1)%7;
+  const sat = new Date(d); sat.setDate(d.getDate()-back);
+  const end = new Date(sat); end.setDate(sat.getDate()+7);
+  return `${sat.getDate()}.${sat.getMonth()+1}.–${end.getDate()}.${end.getMonth()+1}.`;
+}
+
+/* ── Submit ──────────────────────────────────────────────── */
+async function submitBooking(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span>Sprema se...';
+
+  const exc      = document.getElementById('f-excursion').value;
+  const adults   = parseInt(document.getElementById('f-adults').value)||0;
+  const children = parseInt(document.getElementById('f-children').value)||0;
+  const discount = document.getElementById('f-discount').value;
+  const total    = calcTotal(exc,adults,children);
+
+  const booking = {
+    name:       document.getElementById('f-name').value.trim(),
+    phone:      document.getElementById('f-phone').value.trim(),
+    excursion:  exc,
+    departure:  document.getElementById('f-departure').value.trim(),
+    date:       document.getElementById('f-date').value,
+    adults, children,
+    free:       parseInt(document.getElementById('f-free').value)||0,
+    menuRiba:   parseInt(document.getElementById('f-riba').value)||0,
+    menuMeso:   parseInt(document.getElementById('f-meso').value)||0,
+    menuVege:   parseInt(document.getElementById('f-vege').value)||0,
+    deposit:    parseFloat(document.getElementById('f-deposit').value)||0,
+    paid:       document.getElementById('f-paid').value,
+    seller:     document.getElementById('f-seller').value,
+    discount,
+    totalPrice: total,
+    commission: calcComm(total,discount),
+    cancelled:  false,
+    createdAt:  new Date().toISOString()
+  };
+
+  try {
+    await db.ref('bookings').push(booking);
+    toast('Rezervacija je uspješno spremljena! ✓','success');
+    resetForm();
+  } catch(err) {
+    console.error(err);
+    toast('Greška pri spremanju rezervacije','error');
+  }
+  btn.disabled=false;
+  btn.innerHTML='Spremi rezervaciju →';
+}
+
+function resetForm() {
+  document.getElementById('bookingForm').reset();
+  ['f-riba','f-meso','f-vege'].forEach(id=>{
+    document.getElementById(id).value=0;
+    document.getElementById(id+'-disp').textContent=0;
+  });
+  setToggle('paid','NE');
+  setToggle('disc','NE');
+  document.getElementById('pricePreview').style.display='none';
+  document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+}
+
+/* ── Cancel / Activate row ───────────────────────────────── */
+async function toggleCancelled(id, current) {
+  try {
+    await db.ref(`bookings/${id}/cancelled`).set(!current);
+    toast(current ? 'Rezervacija aktivirana ✓' : 'Izlet otkazan','success');
+  } catch(e) { toast('Greška','error'); }
+}
+
+/* ── Table Render ────────────────────────────────────────── */
+function renderTable() {
+  const search   = (document.getElementById('searchInput')?.value||'').toLowerCase();
+  const fExc     = document.getElementById('filterExc')?.value||'';
+  const fSell    = document.getElementById('filterSeller')?.value||'';
+  const fPaid    = document.getElementById('filterPaid')?.value||'';
+  const fMon     = document.getElementById('filterMonth')?.value||'';
+
+  let rows = [...bookings];
+  if (search) rows=rows.filter(b=>
+    (b.name||'').toLowerCase().includes(search)||
+    (b.phone||'').toLowerCase().includes(search)||
+    (b.excursion||'').toLowerCase().includes(search)||
+    (b.seller||'').toLowerCase().includes(search));
+  if (fExc)  rows=rows.filter(b=>b.excursion===fExc);
+  if (fSell) rows=rows.filter(b=>b.seller===fSell);
+  if (fPaid) rows=rows.filter(b=>b.paid===fPaid);
+  if (fMon)  rows=rows.filter(b=>getMjesec(b.date)===fMon);
+
+  rows.sort((a,b)=>{
+    let va=a[sortKey]??'', vb=b[sortKey]??'';
+    if (sortKey==='date'||sortKey==='createdAt') { va=new Date(va||0); vb=new Date(vb||0); }
+    if (va<vb) return sortDir==='asc'?-1:1;
+    if (va>vb) return sortDir==='asc'?1:-1;
+    return 0;
+  });
+
+  // Month filter options
+  const months=[...new Set(bookings.map(b=>getMjesec(b.date)).filter(Boolean))];
+  const mf=document.getElementById('filterMonth');
+  if (mf) {
+    const cur=mf.value;
+    mf.innerHTML=`<option value="">Svi mjeseci</option>`+
+      months.map(m=>`<option value="${esc(m)}"${m===cur?' selected':''}>${esc(m)}</option>`).join('');
+  }
+
+  // Stats
+  const totalRev  = rows.reduce((s,b)=>s+(b.totalPrice||0),0);
+  const totalComm = rows.reduce((s,b)=>s+(b.commission||0),0);
+  document.getElementById('statTotal').textContent    = rows.length;
+  document.getElementById('statAdults').textContent   = rows.reduce((s,b)=>s+(b.adults||0),0);
+  document.getElementById('statChildren').textContent = rows.reduce((s,b)=>s+(b.children||0),0);
+  document.getElementById('statRevenue').textContent  = fmtEur(totalRev);
+  document.getElementById('statComm').textContent     = fmtEur(totalComm);
+
+  const tbody = document.getElementById('tableBody');
+  const empty = document.getElementById('emptyState');
+
+  if (rows.length===0) {
+    tbody.innerHTML='';
+    empty.style.display='block';
+  } else {
+    empty.style.display='none';
+    tbody.innerHTML = rows.map((b,i)=>{
+      // Row class
+      let rowClass = '';
+      if (b.cancelled)        rowClass = 'row-cancelled';
+      else if (b.paid==='NE') rowClass = 'row-unpaid';
+
+      const dateBukingCell = showDateColumn
+        ? `<td style="color:var(--txt-lt);font-size:11px">${fmtDateTime(b.createdAt)}</td>`
+        : `<td></td>`;
+
+      const cancelBtn = b.cancelled
+        ? `<button class="btn-table btn-activate" onclick="toggleCancelled('${b.id}',true)">✓ Aktiviraj</button>`
+        : `<button class="btn-table btn-cancel"   onclick="toggleCancelled('${b.id}',false)">✕ Otkaži</button>`;
+
+      return `<tr class="${rowClass}">
+        <td style="color:var(--txt-lt);font-weight:600">${i+1}</td>
+        <td style="font-weight:700">${esc(b.name)}${b.cancelled?` <span class="badge badge-cancel">OTKAZANO</span>`:''}</td>
+        <td>${esc(b.phone)}</td>
+        <td><span class="badge badge-exc">${esc(b.excursion)}</span></td>
+        <td>${esc(b.departure)}</td>
+        <td style="font-weight:600">${fmtDate(b.date)}</td>
+        <td style="text-transform:capitalize">${getMjesec(b.date)}</td>
+        <td style="font-size:11px;color:var(--txt-md)">${getTjedan(b.date)}</td>
+        <td style="text-align:center">${b.adults||0}</td>
+        <td style="text-align:center">${b.children||0}</td>
+        <td style="text-align:center">${b.free||0}</td>
+        <td style="text-align:center">${b.menuRiba||0}</td>
+        <td style="text-align:center">${b.menuMeso||0}</td>
+        <td style="text-align:center">${b.menuVege||0}</td>
+        <td>${fmtEur(b.deposit)}</td>
+        <td><span class="badge ${b.paid==='DA'?'badge-yes':'badge-no'}">${b.paid}</span></td>
+        <td><span class="badge badge-seller">${esc(b.seller)}</span></td>
+        <td><span class="badge ${b.discount==='DA'?'badge-yes':'badge-no'}">${b.discount}</span></td>
+        <td style="font-weight:800;color:var(--pri)">${fmtEur(b.totalPrice)}</td>
+        <td style="font-weight:700;color:var(--acc-dk)">${fmtEur(b.commission)}</td>
+        ${dateBukingCell}
+        <td style="display:flex;gap:4px;flex-wrap:wrap">
+          ${cancelBtn}
+          <button class="btn-table btn-edit" onclick="openEdit('${b.id}')">✏️</button>
+          <button class="btn-table btn-del"  onclick="confirmDelete('${b.id}')">🗑️</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  const colTh = document.getElementById('colDateBuking');
+  if (colTh) colTh.style.display = showDateColumn ? '' : 'none';
+  document.querySelectorAll('td:nth-child(21)').forEach(td => {
+    td.style.display = showDateColumn ? '' : 'none';
+  });
+}
+
+/* ── Sort ────────────────────────────────────────────────── */
+function sortTable(key) {
+  if (sortKey===key) sortDir=sortDir==='asc'?'desc':'asc';
+  else { sortKey=key; sortDir='asc'; }
+  document.querySelectorAll('th.sortable').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
+  event.target.classList.add(sortDir==='asc'?'sort-asc':'sort-desc');
+  renderTable();
+}
+
+/* ── Toggle date column ──────────────────────────────────── */
+function toggleDateColumn() {
+  showDateColumn=!showDateColumn;
+  document.getElementById('toggleDateBtn').classList.toggle('active',showDateColumn);
+  renderTable();
+}
+
+/* ── Edit ────────────────────────────────────────────────── */
+function openEdit(id) {
+  const b=bookings.find(x=>x.id===id); if(!b) return;
+  editingId=id;
+  document.getElementById('e-name').value      = b.name      ||'';
+  document.getElementById('e-phone').value     = b.phone     ||'';
+  document.getElementById('e-departure').value = b.departure ||'';
+  document.getElementById('e-date').value      = b.date      ||'';
+  document.getElementById('e-adults').value    = b.adults    ||0;
+  document.getElementById('e-children').value  = b.children  ||0;
+  document.getElementById('e-free').value      = b.free      ||0;
+  document.getElementById('e-deposit').value   = b.deposit   ||0;
+  ['riba','meso','vege'].forEach(m=>{
+    const val=b[`menu${m[0].toUpperCase()+m.slice(1)}`]||0;
+    document.getElementById(`e-${m}`).value=val;
+    document.getElementById(`e-${m}-disp`).textContent=val;
+  });
+  setToggleEdit('paid', b.paid||'NE');
+  setToggleEdit('disc', b.discount||'NE');
+  renderSelects();
+  document.getElementById('e-excursion').value = b.excursion||'';
+  document.getElementById('e-seller').value    = b.seller   ||'';
+  document.getElementById('editModal').classList.add('open');
+}
+
+async function saveEdit(e) {
+  e.preventDefault(); if(!editingId) return;
+  const exc      = document.getElementById('e-excursion').value;
+  const adults   = parseInt(document.getElementById('e-adults').value)||0;
+  const children = parseInt(document.getElementById('e-children').value)||0;
+  const discount = document.getElementById('e-discount').value;
+  const total    = calcTotal(exc,adults,children);
+  const updated  = {
+    name:       document.getElementById('e-name').value.trim(),
+    phone:      document.getElementById('e-phone').value.trim(),
+    excursion:  exc,
+    departure:  document.getElementById('e-departure').value.trim(),
+    date:       document.getElementById('e-date').value,
+    adults, children,
+    free:       parseInt(document.getElementById('e-free').value)||0,
+    menuRiba:   parseInt(document.getElementById('e-riba').value)||0,
+    menuMeso:   parseInt(document.getElementById('e-meso').value)||0,
+    menuVege:   parseInt(document.getElementById('e-vege').value)||0,
+    deposit:    parseFloat(document.getElementById('e-deposit').value)||0,
+    paid:       document.getElementById('e-paid').value,
+    seller:     document.getElementById('e-seller').value,
+    discount, totalPrice:total, commission:calcComm(total,discount)
+  };
+  try {
+    await db.ref(`bookings/${editingId}`).update(updated);
+    toast('Rezervacija ažurirana! ✓','success');
+    closeEditModal();
+  } catch(err) { toast('Greška pri ažuriranju','error'); }
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('open');
+  editingId=null;
+}
+
+/* ── Delete ──────────────────────────────────────────────── */
+function confirmDelete(id) { deleteId=id; document.getElementById('confirmDialog').classList.add('open'); }
+function closeConfirm()    { document.getElementById('confirmDialog').classList.remove('open'); deleteId=null; }
+async function confirmDeleteAction() {
+  if (!deleteId) return;
+  try {
+    await db.ref(`bookings/${deleteId}`).remove();
+    toast('Rezervacija je obrisana','success');
+  } catch { toast('Greška pri brisanju','error'); }
+  closeConfirm();
+}
+
+/* ── Tabs ────────────────────────────────────────────────── */
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el=>el.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  if (name==='booking') document.querySelectorAll('.nav-tab')[0].classList.add('active');
+  else                  document.querySelectorAll('.nav-tab')[1].classList.add('active');
+  if (name==='table') renderTable();
+}
+
+/* ── Export to Google Sheets (.xlsx) ─────────────────────── */
+function exportToSheets() {
+  const headers = [
+    'Ime i prezime','Mobitel','Izlet','Polazak','Datum','Mjesec','Tjedan',
+    'Odrasli','Djeca','Gratis','Riba','Meso','Vege',
+    'Polog (€)','Plaćeno','Prodavač','Popust','Otkazano',
+    'Ukupno (€)','Provizija (€)','Datum bukinga'
+  ];
+
+  const rows = bookings.map(b => [
+    b.name||'', b.phone||'', b.excursion||'', b.departure||'',
+    b.date||'', getMjesec(b.date), getTjedan(b.date),
+    b.adults||0, b.children||0, b.free||0,
+    b.menuRiba||0, b.menuMeso||0, b.menuVege||0,
+    b.deposit||0, b.paid||'', b.seller||'', b.discount||'',
+    b.cancelled ? 'DA' : 'NE',
+    b.totalPrice||0, b.commission||0,
+    fmtDateTime(b.createdAt)
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+  // Column widths
+  ws['!cols'] = [
+    {wch:22},{wch:16},{wch:16},{wch:16},{wch:12},{wch:10},{wch:16},
+    {wch:8},{wch:7},{wch:7},{wch:6},{wch:6},{wch:6},
+    {wch:10},{wch:8},{wch:10},{wch:7},{wch:8},
+    {wch:12},{wch:12},{wch:18}
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Rezervacije');
+  XLSX.writeFile(wb, `rezervacije_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Excel datoteka preuzeta — otvorite u Google Sheets ✓','success');
+}
+
+/* ── Formatters ──────────────────────────────────────────── */
+function fmtEur(n)      { return ((n||0).toFixed(2)).replace('.',',') + ' €'; }
+function fmtDate(s)     { if(!s) return '—'; return new Date(s+'T12:00:00').toLocaleDateString('hr-HR'); }
+function fmtDateTime(s) {
+  if(!s) return '—';
+  try { return new Date(s).toLocaleString('hr-HR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  catch { return s; }
+}
+function esc(s)    { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function safeId(s) { return String(s||'').replace(/[^a-zA-Z0-9]/g,'_'); }
+
+/* ── Toast ───────────────────────────────────────────────── */
+let toastT;
+function toast(msg,type='') {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='show '+type;
+  clearTimeout(toastT);
+  toastT=setTimeout(()=>{el.className='';},3500);
+}
+
+/* ── Close modals on overlay click + Esc ─────────────────── */
+['settingsModal','editModal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){
+    if(e.target===this) this.classList.remove('open');
+  });
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    closeSettings(); closeEditModal(); closeConfirm();
+  }
+});
+
+/* ── Start ───────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+  init();
+});
+</script>
+</body>
+</html>
