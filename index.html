@@ -1930,11 +1930,12 @@ function toast(msg,type='') {
 
 // Card config — stored in localStorage
 let cardConfig = {
-  boatName:       'BOAT MURTER',
-  fbName:         'TAKE ME TO CROATIA',
-  waNum:          '+385976440910',
-  boatImg:        '',
-  excursionImages: {}   // { 'Rafting': 'data:image/...', ... }
+  boatName:        'BOAT MURTER',
+  fbName:          'TAKE ME TO CROATIA',
+  waNum:           '+385976440910',
+  boatImg:         '',
+  excursionImages: {},  // { 'Rafting': 'data:image/...', ... }
+  excursionNames:  {}   // { 'Rafting': 'RAFTING CETINA', ... }
 };
 
 function loadCardConfig() {
@@ -1944,6 +1945,7 @@ function loadCardConfig() {
       const saved = JSON.parse(s);
       cardConfig = { ...cardConfig, ...saved };
       if (!cardConfig.excursionImages) cardConfig.excursionImages = {};
+    if (!cardConfig.excursionNames)  cardConfig.excursionNames  = {};
     }
   } catch(e){}
   const bn = document.getElementById('cfg-boat-name');
@@ -2008,32 +2010,54 @@ function renderExcursionImageUploads() {
     const sid      = safeId(exc);
     const hasImg   = !!cardConfig.excursionImages[exc];
     const thumbSrc = hasImg ? cardConfig.excursionImages[exc] : '';
+    const customName = cardConfig.excursionNames[exc] || '';
     return `
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
-                  background:var(--bg2);border-radius:var(--r);margin-bottom:8px">
-        <div style="width:52px;height:40px;border-radius:6px;overflow:hidden;
-                    background:var(--border);flex-shrink:0;position:relative">
-          ${hasImg
-            ? `<img id="exc-thumb-${sid}" src="${thumbSrc}"
-                    style="width:100%;height:100%;object-fit:cover" />`
-            : `<div id="exc-thumb-${sid}" style="width:100%;height:100%;
-                    display:flex;align-items:center;justify-content:center;
-                    font-size:18px">🏖️</div>`
-          }
+      <div style="background:var(--bg2);border-radius:var(--r);
+                  margin-bottom:10px;padding:12px;border:1.5px solid var(--border)">
+        <!-- Naziv izleta -->
+        <div style="font-weight:800;font-size:13px;margin-bottom:10px;
+                    color:var(--txt-md)">${esc(exc)}</div>
+        <!-- Naziv na kartici -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:12px;font-weight:700;color:var(--txt-lt);
+                       white-space:nowrap;min-width:90px">Naziv na kartici</span>
+          <input
+            id="exc-name-${sid}"
+            type="text"
+            value="${esc(customName)}"
+            placeholder="npr. RAFTING CETINA (prazno = defaultni naziv)"
+            oninput="cardConfig.excursionNames['${esc(exc)}'] = this.value.trim()"
+            style="flex:1;padding:8px 12px;border:1.5px solid var(--border);
+                   border-radius:var(--r-sm);background:#fff;font-size:13px;
+                   font-weight:600;color:var(--txt)" />
         </div>
-        <span style="font-weight:700;font-size:13px;flex:1">${esc(exc)}</span>
-        <label id="exc-lbl-${sid}"
-               style="cursor:pointer;padding:6px 12px;border-radius:var(--r-pill);
-                      background:var(--pri);color:#fff;font-size:12px;font-weight:700;
-                      white-space:nowrap">
-          ${hasImg ? '↻ Zamijeni' : '+ Dodaj sliku'}
-          <input type="file" accept="image/*" style="display:none"
-                 onchange="handleExcursionImage('${esc(exc)}', this)" />
-        </label>
-        ${hasImg ? `<button onclick="removeExcursionImage('${esc(exc)}')"
-                     style="padding:6px 10px;border-radius:var(--r-pill);
-                            background:#FDEAEA;color:var(--danger);
-                            font-size:12px;font-weight:700">✕</button>` : ''}
+        <!-- Slika -->
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:56px;height:42px;border-radius:6px;overflow:hidden;
+                      background:var(--border);flex-shrink:0">
+            ${hasImg
+              ? `<img id="exc-thumb-${sid}" src="${thumbSrc}"
+                      style="width:100%;height:100%;object-fit:cover" />`
+              : `<div id="exc-thumb-${sid}" style="width:100%;height:100%;
+                      display:flex;align-items:center;justify-content:center;
+                      font-size:20px">🏖️</div>`
+            }
+          </div>
+          <span style="font-size:12px;color:var(--txt-lt);flex:1">
+            ${hasImg ? '✓ Vlastita slika' : 'Koristi se defaultna slika broda'}
+          </span>
+          <label style="cursor:pointer;padding:6px 12px;border-radius:var(--r-pill);
+                        background:var(--pri);color:#fff;font-size:12px;font-weight:700;
+                        white-space:nowrap">
+            ${hasImg ? '↻ Zamijeni' : '+ Slika'}
+            <input type="file" accept="image/*" style="display:none"
+                   onchange="handleExcursionImage('${esc(exc)}', this)" />
+          </label>
+          ${hasImg ? `<button onclick="removeExcursionImage('${esc(exc)}')"
+                       style="padding:6px 10px;border-radius:var(--r-pill);
+                              background:#FDEAEA;color:var(--danger);
+                              font-size:12px;font-weight:700">✕</button>` : ''}
+        </div>
       </div>`;
   }).join('');
 }
@@ -2061,7 +2085,9 @@ function generateCard(bookingId) {
   const total     = `TOTAL: ${Math.round(b.totalPrice||0)}€`;
   const deposit   = `DEPOSIT: ${Math.round(b.deposit||0)}€`;
   const rest      = `REST: ${Math.round((b.totalPrice||0)-(b.deposit||0))}€`;
-  const boatName  = (cardConfig.boatName || 'BOAT MURTER').toUpperCase();
+  // Naziv: specifičan za izlet ima prioritet nad defaultnim
+  const excName   = (cardConfig.excursionNames || {})[b.excursion];
+  const boatName  = (excName || cardConfig.boatName || 'BOAT MURTER').toUpperCase();
   const fbName    = (cardConfig.fbName   || 'TAKE ME TO CROATIA').toUpperCase();
   const waNum     =  cardConfig.waNum    || '+385976440910';
 
