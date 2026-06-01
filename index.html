@@ -1526,21 +1526,21 @@ function updatePricePreview() {
   const deposit  = parseFloat(document.getElementById('f-deposit')?.value)||0;
   if (!exc) { document.getElementById('pricePreview').style.display='none'; return; }
 
-  const p        = prices[exc]||{adult:0,child:0,type:'person'};
-  const fixed    = p.type === 'fixed';
-  const basePrice= calcTotal(exc, adults, children);
-  const total    = basePrice + deposit;
-  const comm     = calcComm(total);
+  const p     = prices[exc]||{adult:0,child:0,type:'person'};
+  const fixed = p.type === 'fixed';
+  const total = calcTotal(exc, adults, children);   // polog NE ide u total
+  const rest  = Math.max(0, total - deposit);
+  const comm  = calcComm(total);
 
   document.getElementById('pricePreview').style.display='flex';
   document.getElementById('previewTotal').textContent = fmtEur(total);
   document.getElementById('previewComm').textContent  = fmtEur(comm);
 
   const baseText = fixed
-    ? `🚢 Fiksna cijena broda ${fmtEur(basePrice)}`
+    ? `🚢 Fiksna cijena broda`
     : `${adults} odraslih × ${fmtEur(p.adult)} + ${children} djece × ${fmtEur(p.child)}`;
   document.getElementById('previewBreakdown').textContent =
-    `${baseText} + polog ${fmtEur(deposit)} | Provizija: 25%`;
+    `${baseText} | Polog: ${fmtEur(deposit)} | Ostatak: ${fmtEur(rest)} | Provizija: 25%`;
 
   const hint = document.getElementById('fixedPriceHint');
   if (hint) hint.style.display = fixed ? 'flex' : 'none';
@@ -1583,7 +1583,7 @@ async function submitBooking(e) {
   const adults   = parseInt(document.getElementById('f-adults').value)||0;
   const children = parseInt(document.getElementById('f-children').value)||0;
   const deposit  = parseFloat(document.getElementById('f-deposit').value)||0;
-  const total    = calcTotal(exc,adults,children) + deposit;
+  const total    = calcTotal(exc,adults,children);   // polog je dio totala, ne dodaje se
 
   const booking = {
     name:       document.getElementById('f-name').value.trim(),
@@ -1793,7 +1793,7 @@ async function saveEdit(e) {
   const adults   = parseInt(document.getElementById('e-adults').value)||0;
   const children = parseInt(document.getElementById('e-children').value)||0;
   const deposit  = parseFloat(document.getElementById('e-deposit').value)||0;
-  const total    = calcTotal(exc,adults,children) + deposit;
+  const total    = calcTotal(exc,adults,children);   // polog je dio totala, ne dodaje se
   const updated  = {
     name:       document.getElementById('e-name').value.trim(),
     phone:      document.getElementById('e-phone').value.trim(),
