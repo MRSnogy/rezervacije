@@ -291,7 +291,8 @@
     }
     .col-name {
       position:sticky; left:52px; z-index:3;
-      min-width:130px; max-width:160px;
+      width:100px; min-width:100px; max-width:100px;
+      white-space:normal; word-break:break-word; line-height:1.25;
       box-shadow:inset -2px 0 0 rgba(0,0,0,.08);
     }
     .col-actions .btn-table {
@@ -1660,7 +1661,7 @@ function updatePricePreview() {
   const total = calcTotal(exc, adults, children);      // total = odrasli×cijena + djeca×cijena
   const polog = uplaceno + popust;                     // polog = uplaćeno + popust
   const rest  = total - polog;                         // rest  = total − polog
-  const comm  = calcComm(total);
+  const comm  = calcComm(total, popust);               // provizija = total×25% − popust
 
   document.getElementById('pricePreview').style.display='flex';
   document.getElementById('previewTotal').textContent = fmtEur(total);
@@ -1686,7 +1687,7 @@ function calcTotal(exc,adults,children) {
 function isFixedPrice(exc) {
   return (prices[exc]||{}).type === 'fixed';
 }
-function calcComm(total) { return total * 0.25; }
+function calcComm(total, popust) { return (total * 0.25) - (popust || 0); }
 
 function getMjesec(dateStr) {
   if (!dateStr) return '';
@@ -1734,7 +1735,7 @@ async function submitBooking(e) {
     paid:       document.getElementById('f-paid').value,
     seller:     document.getElementById('f-seller').value,
     totalPrice: total,
-    commission: calcComm(total),
+    commission: calcComm(total, popust),
     cancelled:  false,
     createdAt:  new Date().toISOString()
   };
@@ -1956,7 +1957,7 @@ async function saveEdit(e) {
     account:    document.getElementById('e-account').value,
     paid:       document.getElementById('e-paid').value,
     seller:     document.getElementById('e-seller').value,
-    totalPrice:total, commission:calcComm(total)
+    totalPrice:total, commission:calcComm(total, popust)
   };
   try {
     await db.ref(`bookings/${editingId}`).update(updated);
