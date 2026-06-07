@@ -259,23 +259,58 @@
 
     /* Table */
     .table-wrap { background:var(--card); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
-    .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-    table { width:100%; border-collapse:collapse; font-size:13px; }
-    thead tr { background:var(--bg2); border-bottom:2px solid var(--border); }
+    .table-scroll {
+      overflow:auto; -webkit-overflow-scrolling:touch;
+      max-height:calc(100vh - 300px); min-height:240px;
+    }
+    table { width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
+    thead tr { background:var(--bg2); }
     th {
       padding:11px 12px; text-align:left;
       font-size:10px; font-weight:800;
       text-transform:uppercase; letter-spacing:.5px;
       color:var(--txt-md); white-space:nowrap;
+      background:var(--bg2);
+      border-bottom:2px solid var(--border);
+      /* zamrznuto zaglavlje (vertikalni scroll) */
+      position:sticky; top:0; z-index:4;
     }
-    td { padding:11px 12px; border-bottom:1px solid var(--border); vertical-align:middle; white-space:nowrap; }
+    td {
+      padding:11px 12px; border-bottom:1px solid var(--border);
+      vertical-align:middle; white-space:nowrap;
+      background:var(--card);
+    }
     tbody tr:last-child td { border-bottom:none; }
 
+    /* ── Zamrznuti stupci lijevo: Akcije + Ime ──────────────── */
+    .col-actions {
+      position:sticky; left:0; z-index:3;
+      min-width:140px; width:140px;
+      padding-left:8px; padding-right:8px;
+      box-shadow:inset -1px 0 0 var(--border);
+    }
+    .col-name {
+      position:sticky; left:140px; z-index:3;
+      min-width:140px; max-width:170px;
+      box-shadow:inset -2px 0 0 rgba(0,0,0,.08);
+    }
+    .col-actions .btn-table { padding:5px 7px; margin:0; font-size:13px; }
+    /* Zaglavlje zamrznutih stupaca = kut (i top i left sticky) */
+    thead th.col-actions { z-index:6; }
+    thead th.col-name    { z-index:6; }
+
     /* Row states */
-    tr.row-cancelled td { background:#FFF0F0 !important; }
-    tr.row-unpaid td    { background:#FFF8EE !important; }
-    tr.row-cancelled:hover td { background:#FFE4E4 !important; }
-    tr.row-unpaid:hover td    { background:#FFF0DC !important; }
+    tr.row-cancelled td { background:#FFF0F0; }
+    tr.row-unpaid td    { background:#FFF8EE; }
+    tr.row-cancelled:hover td { background:#FFE4E4; }
+    tr.row-unpaid:hover td    { background:#FFF0DC; }
+    tbody tr:hover td   { background:#FDFBF7; }
+    /* zamrznuti stupci moraju imati istu pozadinu kao red (inace proziru) */
+    tr.row-cancelled td.col-actions, tr.row-cancelled td.col-name { background:#FFF0F0; }
+    tr.row-unpaid td.col-actions,    tr.row-unpaid td.col-name    { background:#FFF8EE; }
+    tr.row-cancelled:hover td.col-actions, tr.row-cancelled:hover td.col-name { background:#FFE4E4; }
+    tr.row-unpaid:hover td.col-actions,    tr.row-unpaid:hover td.col-name    { background:#FFF0DC; }
+    tbody tr:hover td.col-actions, tbody tr:hover td.col-name { background:#FDFBF7; }
 
     .badge {
       display:inline-flex; align-items:center;
@@ -919,8 +954,9 @@
         <table id="bookingTable">
           <thead>
             <tr>
+              <th class="col-actions">Akcije</th>
+              <th class="col-name sortable" onclick="sortTable('name')">Ime i prezime</th>
               <th>#</th>
-              <th class="sortable" onclick="sortTable('name')">Ime i prezime</th>
               <th>Mobitel</th>
               <th class="sortable" onclick="sortTable('excursion')">Izlet</th>
               <th>Mjesto polaska</th>
@@ -944,7 +980,6 @@
               <th>Ostatak (€)</th>
               <th class="sortable" onclick="sortTable('commission')">Provizija (€)</th>
               <th id="colDateBuking">Datum bukinga</th>
-              <th>Akcije</th>
             </tr>
           </thead>
           <tbody id="tableBody"></tbody>
@@ -1797,12 +1832,22 @@ function renderTable() {
         : `<td></td>`;
 
       const cancelBtn = b.cancelled
-        ? `<button class="btn-table btn-activate" onclick="toggleCancelled('${b.id}',true)">✓ Aktiviraj</button>`
-        : `<button class="btn-table btn-cancel"   onclick="toggleCancelled('${b.id}',false)">✕ Otkaži</button>`;
+        ? `<button class="btn-table btn-activate" title="Aktiviraj" onclick="toggleCancelled('${b.id}',true)">✓</button>`
+        : `<button class="btn-table btn-cancel"   title="Otkaži"    onclick="toggleCancelled('${b.id}',false)">✕</button>`;
+
+      const actionsCell = `<td class="col-actions">
+        <div style="display:flex;gap:3px;align-items:center">
+          ${cancelBtn}
+          <button class="btn-table btn-gen"  title="Kartica" onclick="generateCard('${b.id}')">🎫</button>
+          <button class="btn-table btn-edit" title="Uredi"   onclick="openEdit('${b.id}')">✏️</button>
+          <button class="btn-table btn-del"  title="Izbriši" onclick="confirmDelete('${b.id}')">🗑️</button>
+        </div>
+      </td>`;
 
       return `<tr class="${rowClass}">
+        ${actionsCell}
+        <td class="col-name" style="font-weight:700">${esc(b.name)}${b.cancelled?` <span class="badge badge-cancel">OTKAZANO</span>`:''}</td>
         <td style="color:var(--txt-lt);font-weight:600">${i+1}</td>
-        <td style="font-weight:700">${esc(b.name)}${b.cancelled?` <span class="badge badge-cancel">OTKAZANO</span>`:''}</td>
         <td>${esc(b.phone)}</td>
         <td><span class="badge badge-exc">${esc(b.excursion)}</span></td>
         <td>${esc(b.depPlace||b.departure||'')}</td>
@@ -1828,19 +1873,14 @@ function renderTable() {
         <td style="font-weight:700;color:var(--danger)">${fmtEur((b.totalPrice||0)-((b.deposit||0)+(b.discountEur||0)))}</td>
         <td style="font-weight:700;color:var(--acc-dk)">${fmtEur(b.commission)}</td>
         ${dateBukingCell}
-        <td style="display:flex;gap:4px;flex-wrap:wrap">
-          ${cancelBtn}
-          <button class="btn-table btn-gen"  onclick="generateCard('${b.id}')">🎫</button>
-          <button class="btn-table btn-edit" onclick="openEdit('${b.id}')">✏️</button>
-          <button class="btn-table btn-del"  onclick="confirmDelete('${b.id}')">🗑️</button>
-        </td>
       </tr>`;
     }).join('');
   }
 
   const colTh = document.getElementById('colDateBuking');
   if (colTh) colTh.style.display = showDateColumn ? '' : 'none';
-  document.querySelectorAll('#tableBody td:nth-child(25)').forEach(td => {
+  // Datum bukinga je sada zadnji (26.) stupac
+  document.querySelectorAll('#tableBody td:nth-child(26)').forEach(td => {
     td.style.display = showDateColumn ? '' : 'none';
   });
 }
