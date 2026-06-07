@@ -813,8 +813,19 @@
         <p class="form-section-title">Plaćanje</p>
         <div class="form-grid">
           <div class="form-group">
-            <label>Uplaćeni polog (€)</label>
+            <label>Uplaćeno (€)</label>
             <input class="form-input" type="number" id="f-deposit" min="0" step="0.01" value="0" oninput="updatePricePreview()" />
+          </div>
+          <div class="form-group">
+            <label>Popust (€)</label>
+            <input class="form-input" type="number" id="f-discount-eur" min="0" step="0.01" value="0" oninput="updatePricePreview()" />
+          </div>
+          <div class="form-group">
+            <label>Na čiji račun je uplaćeno</label>
+            <div class="select-wrap">
+              <select class="form-select" id="f-account"></select>
+            </div>
+            <button type="button" class="btn-link" onclick="openSettings('tabRacuni')">+ Upravljaj računima</button>
           </div>
           <div class="form-group">
             <label>Plaćeno</label>
@@ -923,10 +934,14 @@
               <th>Riba</th>
               <th>Meso</th>
               <th>Vege</th>
+              <th>Uplaćeno (€)</th>
+              <th>Popust (€)</th>
               <th>Polog (€)</th>
+              <th>Račun</th>
               <th>Plaćeno</th>
               <th>Prodavač</th>
               <th class="sortable" onclick="sortTable('totalPrice')">Ukupno (€)</th>
+              <th>Ostatak (€)</th>
               <th class="sortable" onclick="sortTable('commission')">Provizija (€)</th>
               <th id="colDateBuking">Datum bukinga</th>
               <th>Akcije</th>
@@ -957,6 +972,7 @@
       <button class="modal-tab active" onclick="switchTab('tabCijene')">💰 Cijene</button>
       <button class="modal-tab" onclick="switchTab('tabIzleti')">🗺️ Izleti</button>
       <button class="modal-tab" onclick="switchTab('tabProdavaci')">👥 Prodavači</button>
+      <button class="modal-tab" onclick="switchTab('tabRacuni')">💳 Računi</button>
       <button class="modal-tab" onclick="switchTab('tabKartica')">🎫 Kartica</button>
     </div>
 
@@ -1000,6 +1016,18 @@
       <div class="add-row">
         <input type="text" id="newSellerName" placeholder="Ime prodavača" />
         <button class="btn-add" onclick="addSeller()">+ Dodaj</button>
+      </div>
+    </div>
+
+    <!-- TAB: Računi -->
+    <div id="tabRacuni" class="modal-tab-content">
+      <p style="font-size:12px;color:var(--txt-lt);margin-bottom:12px">
+        Osobe/računi na koje se može uplatiti polog.
+      </p>
+      <div id="accountsList" class="sellers-list"></div>
+      <div class="add-row">
+        <input type="text" id="newAccountName" placeholder="Ime osobe / računa" />
+        <button class="btn-add" onclick="addAccount()">+ Dodaj</button>
       </div>
     </div>
 
@@ -1100,8 +1128,18 @@
           <input class="form-input" type="number" id="e-free" min="0" />
         </div>
         <div class="form-group">
-          <label>Uplaćeni polog (€)</label>
+          <label>Uplaćeno (€)</label>
           <input class="form-input" type="number" id="e-deposit" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Popust (€)</label>
+          <input class="form-input" type="number" id="e-discount-eur" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Na čiji račun je uplaćeno</label>
+          <div class="select-wrap">
+            <select class="form-select" id="e-account"></select>
+          </div>
         </div>
       </div>
 
@@ -1237,6 +1275,7 @@ let bookings   = [];
 let prices     = {};
 let excursions = ['Hvar i Brač','Delux','Rafting','Omiš i Cetina','Toni','Sunset Povlja','Sunset Supetar','Dinner Supetar'];
 let sellers    = ['Slavica','Nela','Mirko'];
+let accounts   = ['Slavica','Nela','Mirko'];
 let showDateColumn = true;
 let sortKey = 'date';
 let sortDir = 'desc';
@@ -1257,7 +1296,10 @@ function init() {
       if (d.excursions) excursions = d.excursions;
       if (d.sellers)    sellers    = d.sellers;
       else db.ref('config/sellers').set(sellers);
+      if (d.accounts)   accounts   = d.accounts;
+      else db.ref('config/accounts').set(accounts);
       renderSelects();
+      renderAccountsList();
       renderPriceTable();
       updatePricePreview();
     });
@@ -1298,6 +1340,13 @@ function renderSelects() {
     el.innerHTML = `<option value="">— Odaberi —</option>` +
       sellers.map(s => `<option value="${esc(s)}"${s===cur?' selected':''}>${esc(s)}</option>`).join('');
   });
+  // Account selects (na čiji račun je uplaćeno)
+  ['f-account','e-account'].forEach(id => {
+    const el = document.getElementById(id); if(!el) return;
+    const cur = el.value;
+    el.innerHTML = `<option value="">— Odaberi —</option>` +
+      accounts.map(a => `<option value="${esc(a)}"${a===cur?' selected':''}>${esc(a)}</option>`).join('');
+  });
   // Filter dropdowns
   const fe = document.getElementById('filterExc');
   if (fe) {
@@ -1314,12 +1363,14 @@ function renderSelects() {
 }
 
 /* ── Settings Modal ──────────────────────────────────────── */
-function openSettings() {
+function openSettings(tabId) {
   renderPriceTable();
   renderExcursionsList();
   renderSellersList();
+  renderAccountsList();
   renderExcursionImageUploads();
   document.getElementById('settingsModal').classList.add('open');
+  if (typeof tabId === 'string') switchTab(tabId);
 }
 function closeSettings() {
   document.getElementById('settingsModal').classList.remove('open');
@@ -1327,8 +1378,15 @@ function closeSettings() {
 function switchTab(id) {
   document.querySelectorAll('.modal-tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.modal-tab').forEach(el => el.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  event.target.classList.add('active');
+  const content = document.getElementById(id);
+  if (content) content.classList.add('active');
+  // Activate matching tab button (works both from click event and programmatically)
+  if (typeof event !== 'undefined' && event && event.target && event.target.classList.contains('modal-tab')) {
+    event.target.classList.add('active');
+  } else {
+    const btn = document.querySelector(`.modal-tab[onclick*="${id}"]`);
+    if (btn) btn.classList.add('active');
+  }
 }
 
 /* ── Price Table ─────────────────────────────────────────── */
@@ -1486,8 +1544,40 @@ function removeSeller(name) {
   renderSelects();
 }
 
+/* ── Računi (na čiji račun je uplaćeno) ──────────────────── */
+function renderAccountsList() {
+  const el = document.getElementById('accountsList');
+  if (!el) return;
+  el.innerHTML = accounts.map(a => `
+    <div class="seller-row">
+      <span>💳 ${esc(a)}</span>
+      <button class="btn-del-row" onclick="removeAccount('${esc(a)}')">✕ Ukloni</button>
+    </div>`).join('');
+}
+
+function addAccount() {
+  const el = document.getElementById('newAccountName');
+  const name = el.value.trim();
+  if (!name) { toast('Unesite ime računa','error'); return; }
+  if (accounts.includes(name)) { toast('Račun već postoji','error'); return; }
+  accounts.push(name);
+  el.value='';
+  saveConfig();
+  renderAccountsList();
+  renderSelects();
+  toast(`Račun "${name}" dodan ✓`,'success');
+}
+
+function removeAccount(name) {
+  if (!confirm(`Ukloniti račun "${name}"?`)) return;
+  accounts = accounts.filter(a=>a!==name);
+  saveConfig();
+  renderAccountsList();
+  renderSelects();
+}
+
 function saveConfig() {
-  db.ref('config').set({ prices, excursions, sellers }).catch(()=>{});
+  db.ref('config').set({ prices, excursions, sellers, accounts }).catch(()=>{});
 }
 
 /* ── Counters ────────────────────────────────────────────── */
@@ -1523,13 +1613,15 @@ function updatePricePreview() {
   const exc      = document.getElementById('f-excursion')?.value;
   const adults   = parseInt(document.getElementById('f-adults')?.value)||0;
   const children = parseInt(document.getElementById('f-children')?.value)||0;
-  const deposit  = parseFloat(document.getElementById('f-deposit')?.value)||0;
+  const uplaceno = parseFloat(document.getElementById('f-deposit')?.value)||0;
+  const popust   = parseFloat(document.getElementById('f-discount-eur')?.value)||0;
   if (!exc) { document.getElementById('pricePreview').style.display='none'; return; }
 
   const p     = prices[exc]||{adult:0,child:0,type:'person'};
   const fixed = p.type === 'fixed';
-  const total = calcTotal(exc, adults, children);   // polog NE ide u total
-  const rest  = Math.max(0, total - deposit);
+  const total = calcTotal(exc, adults, children);      // total = odrasli×cijena + djeca×cijena
+  const polog = uplaceno + popust;                     // polog = uplaćeno + popust
+  const rest  = total - polog;                         // rest  = total − polog
   const comm  = calcComm(total);
 
   document.getElementById('pricePreview').style.display='flex';
@@ -1540,7 +1632,7 @@ function updatePricePreview() {
     ? `🚢 Fiksna cijena broda`
     : `${adults} odraslih × ${fmtEur(p.adult)} + ${children} djece × ${fmtEur(p.child)}`;
   document.getElementById('previewBreakdown').textContent =
-    `${baseText} | Polog: ${fmtEur(deposit)} | Ostatak: ${fmtEur(rest)} | Provizija: 25%`;
+    `${baseText} | Polog: ${fmtEur(polog)} (uplaćeno ${fmtEur(uplaceno)} + popust ${fmtEur(popust)}) | Ostatak: ${fmtEur(rest)}`;
 
   const hint = document.getElementById('fixedPriceHint');
   if (hint) hint.style.display = fixed ? 'flex' : 'none';
@@ -1582,8 +1674,9 @@ async function submitBooking(e) {
   const exc      = document.getElementById('f-excursion').value;
   const adults   = parseInt(document.getElementById('f-adults').value)||0;
   const children = parseInt(document.getElementById('f-children').value)||0;
-  const deposit  = parseFloat(document.getElementById('f-deposit').value)||0;
-  const total    = calcTotal(exc,adults,children);   // polog je dio totala, ne dodaje se
+  const uplaceno = parseFloat(document.getElementById('f-deposit').value)||0;
+  const popust   = parseFloat(document.getElementById('f-discount-eur').value)||0;
+  const total    = calcTotal(exc,adults,children);   // total = odrasli×cijena + djeca×cijena
 
   const booking = {
     name:       document.getElementById('f-name').value.trim(),
@@ -1597,7 +1690,9 @@ async function submitBooking(e) {
     menuRiba:   parseInt(document.getElementById('f-riba').value)||0,
     menuMeso:   parseInt(document.getElementById('f-meso').value)||0,
     menuVege:   parseInt(document.getElementById('f-vege').value)||0,
-    deposit,
+    deposit:    uplaceno,                              // uplaćeno (gotovina)
+    discountEur: popust,                               // popust u eurima
+    account:    document.getElementById('f-account').value,
     paid:       document.getElementById('f-paid').value,
     seller:     document.getElementById('f-seller').value,
     totalPrice: total,
@@ -1722,11 +1817,15 @@ function renderTable() {
         <td style="text-align:center">${b.menuMeso||0}</td>
         <td style="text-align:center">${b.menuVege||0}</td>
         <td>${fmtEur(b.deposit)}</td>
+        <td>${fmtEur(b.discountEur)}</td>
+        <td style="font-weight:600">${fmtEur((b.deposit||0)+(b.discountEur||0))}</td>
+        <td>${b.account?`<span class="badge badge-seller">${esc(b.account)}</span>`:'—'}</td>
         <td><span class="badge ${b.paid==='DA'?'badge-yes':'badge-no'}">${b.paid}</span></td>
         <td><span class="badge badge-seller">${esc(b.seller)}</span></td>
         <td style="font-weight:800;color:${isFixedPrice(b.excursion)?'#7C3AED':'var(--pri)'}">
           ${isFixedPrice(b.excursion)?'<span title="Fiksna cijena broda">🚢</span> ':''}${fmtEur(b.totalPrice)}
         </td>
+        <td style="font-weight:700;color:var(--danger)">${fmtEur((b.totalPrice||0)-((b.deposit||0)+(b.discountEur||0)))}</td>
         <td style="font-weight:700;color:var(--acc-dk)">${fmtEur(b.commission)}</td>
         ${dateBukingCell}
         <td style="display:flex;gap:4px;flex-wrap:wrap">
@@ -1741,7 +1840,7 @@ function renderTable() {
 
   const colTh = document.getElementById('colDateBuking');
   if (colTh) colTh.style.display = showDateColumn ? '' : 'none';
-  document.querySelectorAll('td:nth-child(21)').forEach(td => {
+  document.querySelectorAll('#tableBody td:nth-child(25)').forEach(td => {
     td.style.display = showDateColumn ? '' : 'none';
   });
 }
@@ -1773,8 +1872,9 @@ function openEdit(id) {
   document.getElementById('e-date').value      = b.date      ||'';
   document.getElementById('e-adults').value    = b.adults    ||0;
   document.getElementById('e-children').value  = b.children  ||0;
-  document.getElementById('e-free').value      = b.free      ||0;
-  document.getElementById('e-deposit').value   = b.deposit   ||0;
+  document.getElementById('e-free').value         = b.free       ||0;
+  document.getElementById('e-deposit').value      = b.deposit    ||0;
+  document.getElementById('e-discount-eur').value = b.discountEur ||0;
   ['riba','meso','vege'].forEach(m=>{
     const val=b[`menu${m[0].toUpperCase()+m.slice(1)}`]||0;
     document.getElementById(`e-${m}`).value=val;
@@ -1784,6 +1884,7 @@ function openEdit(id) {
   renderSelects();
   document.getElementById('e-excursion').value = b.excursion||'';
   document.getElementById('e-seller').value    = b.seller   ||'';
+  document.getElementById('e-account').value   = b.account  ||'';
   document.getElementById('editModal').classList.add('open');
 }
 
@@ -1792,8 +1893,9 @@ async function saveEdit(e) {
   const exc      = document.getElementById('e-excursion').value;
   const adults   = parseInt(document.getElementById('e-adults').value)||0;
   const children = parseInt(document.getElementById('e-children').value)||0;
-  const deposit  = parseFloat(document.getElementById('e-deposit').value)||0;
-  const total    = calcTotal(exc,adults,children);   // polog je dio totala, ne dodaje se
+  const uplaceno = parseFloat(document.getElementById('e-deposit').value)||0;
+  const popust   = parseFloat(document.getElementById('e-discount-eur').value)||0;
+  const total    = calcTotal(exc,adults,children);   // total = odrasli×cijena + djeca×cijena
   const updated  = {
     name:       document.getElementById('e-name').value.trim(),
     phone:      document.getElementById('e-phone').value.trim(),
@@ -1806,7 +1908,9 @@ async function saveEdit(e) {
     menuRiba:   parseInt(document.getElementById('e-riba').value)||0,
     menuMeso:   parseInt(document.getElementById('e-meso').value)||0,
     menuVege:   parseInt(document.getElementById('e-vege').value)||0,
-    deposit,
+    deposit:    uplaceno,
+    discountEur: popust,
+    account:    document.getElementById('e-account').value,
     paid:       document.getElementById('e-paid').value,
     seller:     document.getElementById('e-seller').value,
     totalPrice:total, commission:calcComm(total)
@@ -1850,20 +1954,23 @@ function exportToSheets() {
   const headers = [
     'Ime i prezime','Mobitel','Izlet','Mjesto polaska','Vrijeme polaska','Datum','Mjesec','Tjedan',
     'Odrasli','Djeca','Gratis','Riba','Meso','Vege',
-    'Polog (€)','Plaćeno','Prodavač','Otkazano',
-    'Ukupno (€)','Provizija (€)','Datum bukinga'
+    'Uplaćeno (€)','Popust (€)','Polog (€)','Račun','Plaćeno','Prodavač','Otkazano',
+    'Ukupno (€)','Ostatak (€)','Provizija (€)','Datum bukinga'
   ];
 
-  const rows = bookings.map(b => [
-    b.name||'', b.phone||'', b.excursion||'', b.depPlace||b.departure||'', b.depTime||'',
-    b.date||'', getMjesec(b.date), getTjedan(b.date),
-    b.adults||0, b.children||0, b.free||0,
-    b.menuRiba||0, b.menuMeso||0, b.menuVege||0,
-    b.deposit||0, b.paid||'', b.seller||'',
-    b.cancelled ? 'DA' : 'NE',
-    b.totalPrice||0, b.commission||0,
-    fmtDateTime(b.createdAt)
-  ]);
+  const rows = bookings.map(b => {
+    const polog = (b.deposit||0) + (b.discountEur||0);
+    return [
+      b.name||'', b.phone||'', b.excursion||'', b.depPlace||b.departure||'', b.depTime||'',
+      b.date||'', getMjesec(b.date), getTjedan(b.date),
+      b.adults||0, b.children||0, b.free||0,
+      b.menuRiba||0, b.menuMeso||0, b.menuVege||0,
+      b.deposit||0, b.discountEur||0, polog, b.account||'', b.paid||'', b.seller||'',
+      b.cancelled ? 'DA' : 'NE',
+      b.totalPrice||0, (b.totalPrice||0)-polog, b.commission||0,
+      fmtDateTime(b.createdAt)
+    ];
+  });
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
@@ -1871,8 +1978,8 @@ function exportToSheets() {
   ws['!cols'] = [
     {wch:22},{wch:16},{wch:16},{wch:16},{wch:12},{wch:10},{wch:16},
     {wch:8},{wch:7},{wch:7},{wch:6},{wch:6},{wch:6},
-    {wch:10},{wch:8},{wch:10},{wch:7},{wch:8},
-    {wch:12},{wch:12},{wch:18}
+    {wch:11},{wch:10},{wch:10},{wch:10},{wch:8},{wch:10},{wch:8},
+    {wch:11},{wch:11},{wch:11},{wch:18}
   ];
 
   const wb = XLSX.utils.book_new();
@@ -2059,9 +2166,10 @@ function generateCard(bookingId) {
   const timeStr   = b.depTime ? b.depTime + 'H' : '—';
   const excUpper  = (b.excursion||'').toUpperCase();
   const people    = `PEOPLE: ${b.adults||0}-${b.children||0}-${b.free||0}`;
+  const pologVal  = (b.deposit||0) + (b.discountEur||0);   // polog = uplaćeno + popust
   const total     = `TOTAL: ${Math.round(b.totalPrice||0)}€`;
-  const deposit   = `DEPOSIT: ${Math.round(b.deposit||0)}€`;
-  const rest      = `REST: ${Math.round((b.totalPrice||0)-(b.deposit||0))}€`;
+  const deposit   = `DEPOSIT: ${Math.round(pologVal)}€`;
+  const rest      = `REST: ${Math.round((b.totalPrice||0)-pologVal)}€`;
   // Naziv: specifičan za izlet ima prioritet nad defaultnim
   const excName   = (cardConfig.excursionNames || {})[b.excursion];
   const boatName  = (excName || cardConfig.boatName || 'BOAT MURTER').toUpperCase();
