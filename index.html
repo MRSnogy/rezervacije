@@ -814,6 +814,10 @@
             <label>Broj gratisa</label>
             <input class="form-input" type="number" id="f-free" min="0" value="0" />
           </div>
+          <div class="form-group">
+            <label>Transfer (broj ljudi)</label>
+            <input class="form-input" type="number" id="f-transfer" min="0" value="0" oninput="updatePricePreview()" />
+          </div>
         </div>
 
         <div class="section-divider"></div>
@@ -971,6 +975,7 @@
               <th>Odrasli</th>
               <th>Djeca</th>
               <th>Gratis</th>
+              <th>Transfer</th>
               <th>Riba</th>
               <th>Meso</th>
               <th>Vege</th>
@@ -1034,6 +1039,14 @@
       <div style="margin-top:12px;padding:10px 14px;background:var(--bg2);border-radius:var(--r);font-size:12px;color:var(--txt-md)">
         💡 <strong>Po osobi:</strong> ukupno = odrasli × cijena + djeca × cijena &nbsp;|&nbsp;
         <span style="color:#7C3AED">🚢 <strong>Fiksna cijena:</strong> iznajmljuje se cijeli brod za jednu fiksnu cifru</span>
+      </div>
+      <div style="margin-top:14px;padding:14px;background:#EAF6FF;border-radius:var(--r);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:20px">🚐</span>
+        <div style="flex:1;min-width:140px">
+          <div style="font-weight:800;font-size:13px;color:var(--txt)">Cijena transfera (€ po osobi)</div>
+          <div style="font-size:11px;color:var(--txt-lt)">Zbraja se u total, ali se NE računa u proviziju.</div>
+        </div>
+        <input class="price-input" type="number" min="0" step="0.01" id="cfg-transfer-price" value="5" style="width:110px" />
       </div>
       <button class="btn-save-all" onclick="savePrices()">Spremi cijene</button>
     </div>
@@ -1165,6 +1178,10 @@
         <div class="form-group">
           <label>Broj gratisa</label>
           <input class="form-input" type="number" id="e-free" min="0" />
+        </div>
+        <div class="form-group">
+          <label>Transfer (broj ljudi)</label>
+          <input class="form-input" type="number" id="e-transfer" min="0" />
         </div>
         <div class="form-group">
           <label>Uplaćeno (€)</label>
@@ -1315,6 +1332,7 @@ let prices     = {};
 let excursions = ['Hvar i Brač','Delux','Rafting','Omiš i Cetina','Toni','Sunset Povlja','Sunset Supetar','Dinner Supetar'];
 let sellers    = ['Slavica','Nela','Mirko'];
 let accounts   = ['Slavica','Nela','Mirko'];
+let transferPrice = 5;   // fiksna cijena transfera po osobi (€)
 let showDateColumn = true;
 let sortKey = 'date';
 let sortDir = 'desc';
@@ -1337,9 +1355,13 @@ function init() {
       else db.ref('config/sellers').set(sellers);
       if (d.accounts)   accounts   = d.accounts;
       else db.ref('config/accounts').set(accounts);
+      if (typeof d.transferPrice === 'number') transferPrice = d.transferPrice;
+      else db.ref('config/transferPrice').set(transferPrice);
       renderSelects();
       renderAccountsList();
       renderPriceTable();
+      const tp = document.getElementById('cfg-transfer-price');
+      if (tp) tp.value = transferPrice;
       updatePricePreview();
     });
 
@@ -1491,7 +1513,8 @@ function savePrices() {
     const f    = parseFloat(document.getElementById(`pf-${sid}`)?.value)||0;
     prices[exc] = { adult:a, child:c, fixed:f, type };
   });
-  db.ref('config/prices').set(prices)
+  transferPrice = parseFloat(document.getElementById('cfg-transfer-price')?.value)||0;
+  db.ref('config').update({ prices, transferPrice })
     .then(()=>toast('Cijene su spremljene! ✓','success'))
     .catch(()=>toast('Greška pri spremanju','error'));
   updatePricePreview();
@@ -1616,7 +1639,7 @@ function removeAccount(name) {
 }
 
 function saveConfig() {
-  db.ref('config').set({ prices, excursions, sellers, accounts }).catch(()=>{});
+  db.ref('config').set({ prices, excursions, sellers, accounts, transferPrice }).catch(()=>{});
 }
 
 /* ── Counters ────────────────────────────────────────────── */
@@ -1656,12 +1679,15 @@ function updatePricePreview() {
   const popust   = parseFloat(document.getElementById('f-discount-eur')?.value)||0;
   if (!exc) { document.getElementById('pricePreview').style.display='none'; return; }
 
+  const transferCnt = parseInt(document.getElementById('f-transfer')?.value)||0;
+  const transferTot = transferCnt * transferPrice;     // transfer = broj ljudi × cijena
   const p     = prices[exc]||{adult:0,child:0,type:'person'};
   const fixed = p.type === 'fixed';
-  const total = calcTotal(exc, adults, children);      // total = odrasli×cijena + djeca×cijena
+  const base  = calcTotal(exc, adults, children);      // cijena izleta
+  const total = base + transferTot;                    // total = izlet + transfer
   const polog = uplaceno + popust;                     // polog = uplaćeno + popust
   const rest  = total - polog;                         // rest  = total − polog
-  const comm  = calcComm(total, popust);               // provizija = total×25% − popust
+  const comm  = calcComm(base, popust);                // provizija = izlet×25% − popust (BEZ transfera)
 
   document.getElementById('pricePreview').style.display='flex';
   document.getElementById('previewTotal').textContent = fmtEur(total);
@@ -1670,8 +1696,9 @@ function updatePricePreview() {
   const baseText = fixed
     ? `🚢 Fiksna cijena broda`
     : `${adults} odraslih × ${fmtEur(p.adult)} + ${children} djece × ${fmtEur(p.child)}`;
+  const transferText = transferCnt > 0 ? ` + transfer ${transferCnt}×${fmtEur(transferPrice)} = ${fmtEur(transferTot)}` : '';
   document.getElementById('previewBreakdown').textContent =
-    `${baseText} | Polog: ${fmtEur(polog)} (uplaćeno ${fmtEur(uplaceno)} + popust ${fmtEur(popust)}) | Ostatak: ${fmtEur(rest)}`;
+    `${baseText}${transferText} | Polog: ${fmtEur(polog)} | Ostatak: ${fmtEur(rest)} | Provizija bez transfera`;
 
   const hint = document.getElementById('fixedPriceHint');
   if (hint) hint.style.display = fixed ? 'flex' : 'none';
@@ -1715,7 +1742,10 @@ async function submitBooking(e) {
   const children = parseInt(document.getElementById('f-children').value)||0;
   const uplaceno = parseFloat(document.getElementById('f-deposit').value)||0;
   const popust   = parseFloat(document.getElementById('f-discount-eur').value)||0;
-  const total    = calcTotal(exc,adults,children);   // total = odrasli×cijena + djeca×cijena
+  const transferCnt = parseInt(document.getElementById('f-transfer').value)||0;
+  const transferTot = transferCnt * transferPrice;
+  const base     = calcTotal(exc,adults,children);   // cijena izleta
+  const total    = base + transferTot;               // total = izlet + transfer
 
   const booking = {
     name:       document.getElementById('f-name').value.trim(),
@@ -1726,6 +1756,8 @@ async function submitBooking(e) {
     date:       document.getElementById('f-date').value,
     adults, children,
     free:       parseInt(document.getElementById('f-free').value)||0,
+    transfer:   transferCnt,                           // broj ljudi za transfer
+    transferTotal: transferTot,                        // ukupna cijena transfera
     menuRiba:   parseInt(document.getElementById('f-riba').value)||0,
     menuMeso:   parseInt(document.getElementById('f-meso').value)||0,
     menuVege:   parseInt(document.getElementById('f-vege').value)||0,
@@ -1735,7 +1767,7 @@ async function submitBooking(e) {
     paid:       document.getElementById('f-paid').value,
     seller:     document.getElementById('f-seller').value,
     totalPrice: total,
-    commission: calcComm(total, popust),
+    commission: calcComm(base, popust),                // provizija BEZ transfera
     cancelled:  false,
     createdAt:  new Date().toISOString()
   };
@@ -1759,7 +1791,7 @@ function resetForm() {
     document.getElementById(id+'-disp').textContent=0;
   });
   setToggle('paid','NE');
-  setToggle('disc','NE');
+  document.getElementById('f-transfer').value=0;
   document.getElementById('pricePreview').style.display='none';
   document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
 }
@@ -1862,6 +1894,7 @@ function renderTable() {
         <td style="text-align:center">${b.adults||0}</td>
         <td style="text-align:center">${b.children||0}</td>
         <td style="text-align:center">${b.free||0}</td>
+        <td style="text-align:center">${b.transfer?`${b.transfer} <span style="color:var(--txt-lt);font-size:11px">(${fmtEur(b.transferTotal)})</span>`:'0'}</td>
         <td style="text-align:center">${b.menuRiba||0}</td>
         <td style="text-align:center">${b.menuMeso||0}</td>
         <td style="text-align:center">${b.menuVege||0}</td>
@@ -1883,8 +1916,8 @@ function renderTable() {
 
   const colTh = document.getElementById('colDateBuking');
   if (colTh) colTh.style.display = showDateColumn ? '' : 'none';
-  // Datum bukinga je sada zadnji (26.) stupac
-  document.querySelectorAll('#tableBody td:nth-child(26)').forEach(td => {
+  // Datum bukinga je sada zadnji (27.) stupac
+  document.querySelectorAll('#tableBody td:nth-child(27)').forEach(td => {
     td.style.display = showDateColumn ? '' : 'none';
   });
 }
@@ -1917,6 +1950,7 @@ function openEdit(id) {
   document.getElementById('e-adults').value    = b.adults    ||0;
   document.getElementById('e-children').value  = b.children  ||0;
   document.getElementById('e-free').value         = b.free       ||0;
+  document.getElementById('e-transfer').value     = b.transfer   ||0;
   document.getElementById('e-deposit').value      = b.deposit    ||0;
   document.getElementById('e-discount-eur').value = b.discountEur ||0;
   ['riba','meso','vege'].forEach(m=>{
@@ -1939,7 +1973,10 @@ async function saveEdit(e) {
   const children = parseInt(document.getElementById('e-children').value)||0;
   const uplaceno = parseFloat(document.getElementById('e-deposit').value)||0;
   const popust   = parseFloat(document.getElementById('e-discount-eur').value)||0;
-  const total    = calcTotal(exc,adults,children);   // total = odrasli×cijena + djeca×cijena
+  const transferCnt = parseInt(document.getElementById('e-transfer').value)||0;
+  const transferTot = transferCnt * transferPrice;
+  const base     = calcTotal(exc,adults,children);   // cijena izleta
+  const total    = base + transferTot;               // total = izlet + transfer
   const updated  = {
     name:       document.getElementById('e-name').value.trim(),
     phone:      document.getElementById('e-phone').value.trim(),
@@ -1949,6 +1986,8 @@ async function saveEdit(e) {
     date:       document.getElementById('e-date').value,
     adults, children,
     free:       parseInt(document.getElementById('e-free').value)||0,
+    transfer:   transferCnt,
+    transferTotal: transferTot,
     menuRiba:   parseInt(document.getElementById('e-riba').value)||0,
     menuMeso:   parseInt(document.getElementById('e-meso').value)||0,
     menuVege:   parseInt(document.getElementById('e-vege').value)||0,
@@ -1957,7 +1996,7 @@ async function saveEdit(e) {
     account:    document.getElementById('e-account').value,
     paid:       document.getElementById('e-paid').value,
     seller:     document.getElementById('e-seller').value,
-    totalPrice:total, commission:calcComm(total, popust)
+    totalPrice:total, commission:calcComm(base, popust)
   };
   try {
     await db.ref(`bookings/${editingId}`).update(updated);
@@ -1997,17 +2036,18 @@ function showTab(name) {
 function exportToSheets() {
   const headers = [
     'Ime i prezime','Mobitel','Izlet','Mjesto polaska','Vrijeme polaska','Datum','Mjesec','Tjedan',
-    'Odrasli','Djeca','Gratis','Riba','Meso','Vege',
+    'Odrasli','Djeca','Gratis','Transfer (ljudi)','Transfer (€)','Riba','Meso','Vege',
     'Uplaćeno (€)','Popust (€)','Polog (€)','Račun','Plaćeno','Prodavač','Otkazano',
     'Ukupno (€)','Ostatak (€)','Provizija (€)','Datum bukinga'
   ];
 
   const rows = bookings.map(b => {
     const polog = (b.deposit||0) + (b.discountEur||0);
+    const transferTot = (typeof b.transferTotal === 'number') ? b.transferTotal : ((b.transfer||0)*transferPrice);
     return [
       b.name||'', b.phone||'', b.excursion||'', b.depPlace||b.departure||'', b.depTime||'',
       b.date||'', getMjesec(b.date), getTjedan(b.date),
-      b.adults||0, b.children||0, b.free||0,
+      b.adults||0, b.children||0, b.free||0, b.transfer||0, transferTot,
       b.menuRiba||0, b.menuMeso||0, b.menuVege||0,
       b.deposit||0, b.discountEur||0, polog, b.account||'', b.paid||'', b.seller||'',
       b.cancelled ? 'DA' : 'NE',
@@ -2021,7 +2061,7 @@ function exportToSheets() {
   // Column widths
   ws['!cols'] = [
     {wch:22},{wch:16},{wch:16},{wch:16},{wch:12},{wch:10},{wch:16},
-    {wch:8},{wch:7},{wch:7},{wch:6},{wch:6},{wch:6},
+    {wch:8},{wch:7},{wch:7},{wch:6},{wch:13},{wch:11},{wch:6},{wch:6},{wch:6},
     {wch:11},{wch:10},{wch:10},{wch:10},{wch:8},{wch:10},{wch:8},
     {wch:11},{wch:11},{wch:11},{wch:18}
   ];
@@ -2348,9 +2388,12 @@ function generateCard(bookingId) {
     ctx.textBaseline = 'middle';
 
     // 3b. INFO BOXOVI (desna strana)
-    const items = [excUpper, people, total, deposit, rest];
+    const transferTot = (typeof b.transferTotal === 'number') ? b.transferTotal : ((b.transfer||0) * transferPrice);
+    const items = [excUpper, people];
+    if ((b.transfer||0) > 0) items.push(`TRANSFER: ${Math.round(transferTot)}€`);
+    items.push(total, deposit, rest);
     const gap  = 8;
-    const iH   = (midH - gap*4) / 5;
+    const iH   = (midH - gap*(items.length-1)) / items.length;
 
     items.forEach((text, i) => {
       const iy = midY + i*(iH+gap);
