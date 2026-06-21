@@ -1091,10 +1091,6 @@
           <input class="form-input" type="text" id="cfg-boat-name" placeholder="BOAT MURTER" value="BOAT MURTER" />
         </div>
         <div class="form-group">
-          <label>Facebook naziv</label>
-          <input class="form-input" type="text" id="cfg-fb-name" placeholder="TAKE ME TO CROATIA" value="TAKE ME TO CROATIA" />
-        </div>
-        <div class="form-group full">
           <label>WhatsApp broj</label>
           <input class="form-input" type="text" id="cfg-wa-num" placeholder="+385976440910" value="+385976440910" />
         </div>
@@ -2117,10 +2113,8 @@ function loadCardConfig() {
     }
   } catch(e){}
   const bn = document.getElementById('cfg-boat-name');
-  const fb = document.getElementById('cfg-fb-name');
   const wa = document.getElementById('cfg-wa-num');
   if (bn) bn.value = cardConfig.boatName;
-  if (fb) fb.value = cardConfig.fbName;
   if (wa) wa.value = cardConfig.waNum;
   if (cardConfig.boatImg) {
     const thumb = document.getElementById('boatImgThumb');
@@ -2232,7 +2226,6 @@ function renderExcursionImageUploads() {
 
 function saveCardConfig() {
   cardConfig.boatName = document.getElementById('cfg-boat-name').value.trim() || 'BOAT MURTER';
-  cardConfig.fbName   = document.getElementById('cfg-fb-name').value.trim()   || 'TAKE ME TO CROATIA';
   cardConfig.waNum    = document.getElementById('cfg-wa-num').value.trim()    || '+385976440910';
   localStorage.setItem('cardConfig', JSON.stringify(cardConfig));
   toast('Postavke kartice su spremljene! ✓', 'success');
@@ -2430,15 +2423,11 @@ function generateCard(bookingId) {
     ctx.textBaseline = 'middle';
     const bMid = botY + botH/2;
 
-    // Facebook
+    // WhatsApp (donji desni kut) — donji lijevi kut ostaje prazan
     ctx.fillStyle = '#ffffff';
     ctx.font = `700 16px Arial, Helvetica, sans-serif`;
     ctx.shadowColor  = 'rgba(0,0,0,0.4)';
     ctx.shadowBlur   = 3;
-    ctx.textAlign    = 'left';
-    ctx.fillText('f  ' + fbName, PAD+16, bMid);
-
-    // WhatsApp
     ctx.textAlign = 'right';
     ctx.fillText(waNum, W-PAD-16, bMid);
     ctx.shadowColor = 'transparent';
