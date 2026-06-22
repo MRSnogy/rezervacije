@@ -905,7 +905,7 @@
     <div class="table-header">
       <h2>📊 Rezervacije</h2>
       <div class="table-controls">
-        <input class="search-input" type="text" placeholder="🔍 Pretraži..." oninput="renderTable()" id="searchInput" />
+        <input class="search-input" type="text" placeholder="🔍 Pretraži po imenu i prezimenu..." oninput="renderTable()" id="searchInput" />
         <button class="btn-sm" id="toggleDateBtn" onclick="toggleDateColumn()">📅 Datum bukinga</button>
         <button class="btn-sheets" onclick="exportToSheets()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
@@ -953,6 +953,11 @@
       <div class="select-wrap" style="width:130px">
         <select class="filter-select" id="filterMonth" onchange="renderTable()" style="width:100%">
           <option value="">Svi mjeseci</option>
+        </select>
+      </div>
+      <div class="select-wrap" style="width:160px">
+        <select class="filter-select" id="filterWeek" onchange="renderTable()" style="width:100%">
+          <option value="">Svi tjedni</option>
         </select>
       </div>
     </div>
@@ -1807,6 +1812,7 @@ function renderTable() {
   const fSell    = document.getElementById('filterSeller')?.value||'';
   const fPaid    = document.getElementById('filterPaid')?.value||'';
   const fMon     = document.getElementById('filterMonth')?.value||'';
+  const fWeek    = document.getElementById('filterWeek')?.value||'';
 
   let rows = [...bookings];
   if (search) rows=rows.filter(b=>
@@ -1818,6 +1824,7 @@ function renderTable() {
   if (fSell) rows=rows.filter(b=>b.seller===fSell);
   if (fPaid) rows=rows.filter(b=>b.paid===fPaid);
   if (fMon)  rows=rows.filter(b=>getMjesec(b.date)===fMon);
+  if (fWeek) rows=rows.filter(b=>getTjedan(b.date)===fWeek);
 
   rows.sort((a,b)=>{
     let va=a[sortKey]??'', vb=b[sortKey]??'';
@@ -1834,6 +1841,17 @@ function renderTable() {
     const cur=mf.value;
     mf.innerHTML=`<option value="">Svi mjeseci</option>`+
       months.map(m=>`<option value="${esc(m)}"${m===cur?' selected':''}>${esc(m)}</option>`).join('');
+  }
+
+  // Week filter options (sortirano kronološki po datumu)
+  const wf=document.getElementById('filterWeek');
+  if (wf) {
+    const cur=wf.value;
+    const weekMap={};
+    bookings.forEach(b=>{ const w=getTjedan(b.date); if(w && !(w in weekMap)) weekMap[w]=b.date; });
+    const weeks=Object.keys(weekMap).sort((a,b)=>new Date(weekMap[a])-new Date(weekMap[b]));
+    wf.innerHTML=`<option value="">Svi tjedni</option>`+
+      weeks.map(w=>`<option value="${esc(w)}"${w===cur?' selected':''}>${esc(w)}</option>`).join('');
   }
 
   // Stats
